@@ -25,6 +25,81 @@ class Profissionais {
 
   }
 
+  static async buscarPorNome(nome) {
+
+  return await sql`
+
+    SELECT
+    p.*,
+    c.nome AS clinica_nome,
+    e.nome AS especialidade_nome
+
+    FROM profissionais p
+
+    INNER JOIN clinicas c
+    ON p.id_clinica = c.id_clinica
+
+    INNER JOIN especialidades e
+    ON p.id_especialidade = e.id_especialidade
+
+    WHERE p.nome ILIKE ${"%" + nome + "%"}
+
+    ORDER BY p.nome
+
+  `;
+
+  }
+
+    static async buscarPorClinica(idClinica) {
+
+    return await sql`
+
+      SELECT
+        p.*,
+        c.nome AS clinica_nome,
+        e.nome AS especialidade_nome
+
+      FROM profissionais p
+
+      INNER JOIN clinicas c
+      ON p.id_clinica = c.id_clinica
+
+      INNER JOIN especialidades e
+      ON p.id_especialidade = e.id_especialidade
+
+      WHERE p.id_clinica = ${idClinica}
+
+      ORDER BY p.nome
+
+    `;
+
+  }
+
+  static async buscarPorEspecialidade(idEspecialidade) {
+
+    return await sql`
+
+      SELECT
+        p.*,
+        c.nome AS clinica_nome,
+        e.nome AS especialidade_nome
+
+      FROM profissionais p
+
+      INNER JOIN clinicas c
+      ON p.id_clinica = c.id_clinica
+
+      INNER JOIN especialidades e
+      ON p.id_especialidade = e.id_especialidade
+
+      WHERE p.id_especialidade = ${idEspecialidade}
+
+      ORDER BY p.nome
+
+    `;
+
+  }
+
   static async buscarPorId(id) {
 
     const resultado = await sql`

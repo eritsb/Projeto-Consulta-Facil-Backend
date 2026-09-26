@@ -3,29 +3,61 @@ const ProfissionaisService =
 
 class ProfissionaisController {
 
-  static async listar(req,res){
+  static async listar(req, res) {
 
-    try {
+  try {
 
-      const profissionais =
+    const {
+      nome,
+      clinica,
+      especialidade
+    } = req.query;
+
+    let profissionais;
+
+    if (nome) {
+
+      profissionais =
+        await ProfissionaisService
+          .buscarPorNome(nome);
+
+    } else if (clinica) {
+
+      profissionais =
+        await ProfissionaisService
+          .buscarPorClinica(clinica);
+
+    } else if (especialidade) {
+
+      profissionais =
+        await ProfissionaisService
+          .buscarPorEspecialidade(
+            especialidade
+          );
+
+    } else {
+
+      profissionais =
         await ProfissionaisService
           .listarTodos();
 
-      return res
-        .status(200)
-        .json(profissionais);
-
-    } catch(error){
-
-      return res
-        .status(500)
-        .json({
-          erro:error.message
-        });
-
     }
 
+    return res
+      .status(200)
+      .json(profissionais);
+
+  } catch (error) {
+
+    return res
+      .status(500)
+      .json({
+        erro: error.message
+      });
+
   }
+
+}
 
   static async buscarPorId(req,res){
 

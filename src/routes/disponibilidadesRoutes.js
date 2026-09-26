@@ -1,37 +1,42 @@
 const express =
- require("express");
+  require("express");
 
 const router =
- express.Router();
+  express.Router();
 
 const DisponibilidadesController =
- require(
-  "../controllers/disponibilidadesController"
- );
+  require(
+    "../controllers/disponibilidadesController"
+  );
 
 router.get(
- "/",
- DisponibilidadesController.listar
+  "/",
+  DisponibilidadesController.listar
 );
 
 router.get(
- "/:id",
- DisponibilidadesController.buscarPorId
+  "/profissional/:id",
+  DisponibilidadesController.listarPorProfissional
+);
+
+router.get(
+  "/:id",
+  DisponibilidadesController.buscarPorId
 );
 
 router.post(
- "/",
- DisponibilidadesController.cadastrar
+  "/",
+  DisponibilidadesController.cadastrar
 );
 
 router.put(
- "/:id",
- DisponibilidadesController.atualizar
+  "/:id",
+  DisponibilidadesController.atualizar
 );
 
 router.delete(
- "/:id",
- DisponibilidadesController.excluir
+  "/:id",
+  DisponibilidadesController.excluir
 );
 
 module.exports = router;

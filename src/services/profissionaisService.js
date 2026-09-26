@@ -9,6 +9,30 @@ class ProfissionaisService {
 
   }
 
+  static async buscarPorNome(nome) {
+
+    return await Profissionais.buscarPorNome(nome);
+
+  }
+
+    static async buscarPorClinica(idClinica) {
+
+    return await Profissionais.buscarPorClinica(
+      idClinica
+    );
+
+  }
+
+  static async buscarPorEspecialidade(
+    idEspecialidade
+  ) {
+
+    return await Profissionais.buscarPorEspecialidade(
+      idEspecialidade
+    );
+
+  }
+
   static async buscarPorId(id) {
 
     const profissional =

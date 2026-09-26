@@ -1,14 +1,12 @@
 const DisponibilidadesService =
- require(
- "../services/disponibilidadesService"
- );
+  require(
+    "../services/disponibilidadesService"
+  );
 
 class DisponibilidadesController {
 
-  static async listar(req,res){
-
-    try{
-
+  static async listar(req, res) {
+    try {
       const dados =
         await DisponibilidadesService
           .listarTodos();
@@ -17,22 +15,41 @@ class DisponibilidadesController {
         .status(200)
         .json(dados);
 
-    }catch(error){
-
+    } catch (error) {
       return res
         .status(500)
         .json({
-          erro:error.message
+          erro: error.message
         });
-
     }
-
   }
 
-  static async buscarPorId(req,res){
+  static async listarPorProfissional(
+    req,
+    res
+  ) {
+    try {
+      const dados =
+        await DisponibilidadesService
+          .listarPorProfissional(
+            req.params.id
+          );
 
-    try{
+      return res
+        .status(200)
+        .json(dados);
 
+    } catch (error) {
+      return res
+        .status(500)
+        .json({
+          erro: error.message
+        });
+    }
+  }
+
+  static async buscarPorId(req, res) {
+    try {
       const dados =
         await DisponibilidadesService
           .buscarPorId(
@@ -43,48 +60,36 @@ class DisponibilidadesController {
         .status(200)
         .json(dados);
 
-    }catch(error){
-
+    } catch (error) {
       return res
         .status(404)
         .json({
-          erro:error.message
+          erro: error.message
         });
-
     }
-
   }
 
-  static async cadastrar(req,res){
-
-    try{
-
+  static async cadastrar(req, res) {
+    try {
       const dados =
         await DisponibilidadesService
-          .cadastrar(
-            req.body
-          );
+          .cadastrar(req.body);
 
       return res
         .status(201)
         .json(dados);
 
-    }catch(error){
-
+    } catch (error) {
       return res
         .status(400)
         .json({
-          erro:error.message
+          erro: error.message
         });
-
     }
-
   }
 
-  static async atualizar(req,res){
-
-    try{
-
+  static async atualizar(req, res) {
+    try {
       const dados =
         await DisponibilidadesService
           .atualizar(
@@ -96,22 +101,17 @@ class DisponibilidadesController {
         .status(200)
         .json(dados);
 
-    }catch(error){
-
+    } catch (error) {
       return res
         .status(400)
         .json({
-          erro:error.message
+          erro: error.message
         });
-
     }
-
   }
 
-  static async excluir(req,res){
-
-    try{
-
+  static async excluir(req, res) {
+    try {
       const dados =
         await DisponibilidadesService
           .excluir(
@@ -120,25 +120,17 @@ class DisponibilidadesController {
 
       return res
         .status(200)
-        .json({
-          mensagem:
-            "Disponibilidade removida",
-          dados
-        });
+        .json(dados);
 
-    }catch(error){
-
+    } catch (error) {
       return res
-        .status(400)
+        .status(404)
         .json({
-          erro:error.message
+          erro: error.message
         });
-
     }
-
   }
-
 }
 
 module.exports =
- DisponibilidadesController;
+  DisponibilidadesController;
