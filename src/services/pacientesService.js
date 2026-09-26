@@ -63,6 +63,10 @@ class PacientesService {
     return await Pacientes.listarTodos();
   }
 
+  static async buscarPorNome(nome) {
+    return await Pacientes.buscarPorNome(nome);
+  }
+
   static async buscarPorId(id) {
     const idPaciente = this.validarId(id);
 

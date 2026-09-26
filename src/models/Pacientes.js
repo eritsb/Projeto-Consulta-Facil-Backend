@@ -19,6 +19,24 @@ class Pacientes {
     `;
   }
 
+ static async buscarPorNome(nome) {
+    return await sql`
+        SELECT
+            id_paciente,
+            nome,
+            cpf,
+            data_nascimento,
+            telefone,
+            email,
+            endereco,
+            ativo,
+            data_cadastro
+        FROM pacientes
+        WHERE nome ILIKE ${"%" + nome + "%"}
+        ORDER BY nome
+    `;
+}
+  
   static async buscarPorId(id) {
     const resultado = await sql`
       SELECT
