@@ -1,35 +1,37 @@
 const Disponibilidades =
- require("../models/Disponibilidades");
+  require("../models/Disponibilidades");
 
 class DisponibilidadesService {
 
   static async listarTodos() {
-
     return await Disponibilidades
       .listarTodos();
+  }
 
+  static async listarPorProfissional(
+    idProfissional
+  ) {
+    return await Disponibilidades
+      .listarPorProfissional(
+        idProfissional
+      );
   }
 
   static async buscarPorId(id) {
-
     const disponibilidade =
       await Disponibilidades
         .buscarPorId(id);
 
     if (!disponibilidade) {
-
       throw new Error(
         "Disponibilidade não encontrada"
       );
-
     }
 
     return disponibilidade;
-
   }
 
   static async cadastrar(dados) {
-
     const {
       id_profissional,
       data,
@@ -43,11 +45,9 @@ class DisponibilidadesService {
       !hora_inicio ||
       !hora_fim
     ) {
-
       throw new Error(
         "Todos os campos são obrigatórios"
       );
-
     }
 
     const existe =
@@ -60,11 +60,9 @@ class DisponibilidadesService {
         );
 
     if (existe) {
-
       throw new Error(
         "Disponibilidade já cadastrada"
       );
-
     }
 
     return await Disponibilidades
@@ -72,53 +70,38 @@ class DisponibilidadesService {
         ...dados,
         status: "DISPONIVEL"
       });
-
   }
 
-  static async atualizar(id,dados){
-
+  static async atualizar(id, dados) {
     const disponibilidade =
       await Disponibilidades
         .buscarPorId(id);
 
-    if (!disponibilidade){
-
+    if (!disponibilidade) {
       throw new Error(
         "Disponibilidade não encontrada"
       );
-
     }
 
     return await Disponibilidades
-      .atualizar(
-        id,
-        {
-          ...disponibilidade,
-          ...dados
-        }
-      );
-
+      .atualizar(id, dados);
   }
 
-  static async excluir(id){
-
+  static async excluir(id) {
     const disponibilidade =
       await Disponibilidades
-        .excluir(id);
+        .buscarPorId(id);
 
-    if (!disponibilidade){
-
+    if (!disponibilidade) {
       throw new Error(
         "Disponibilidade não encontrada"
       );
-
     }
 
-    return disponibilidade;
-
+    return await Disponibilidades
+      .excluir(id);
   }
-
 }
 
 module.exports =
- DisponibilidadesService;
+  DisponibilidadesService;
