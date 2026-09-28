@@ -12,9 +12,7 @@ class AuthService {
   ) {
 
     const erro =
-      new Error(async (params) => {
-        mensagem
-      });
+      new Error(mensagem);
 
     erro.statusCode =
       statusCode;
