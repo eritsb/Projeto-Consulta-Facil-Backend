@@ -17,6 +17,7 @@ O backend utiliza Node.js, Express e PostgreSQL, com banco de dados hospedado no
 
 - Felipe Michell
 - Kennedy Veras
+- Flávio Gonçalves 
 
 ---
 
