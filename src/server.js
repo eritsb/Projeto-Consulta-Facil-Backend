@@ -1,5 +1,11 @@
 require("dotenv").config();
 
+const swaggerUi =
+  require("swagger-ui-express");
+
+const swaggerSpec =
+  require("./swagger");
+
 const express = require("express");
 const cors = require("cors");
 
@@ -78,6 +84,12 @@ app.use(
 app.use(
   "/agendamentos",
   agendamentosRoutes
+);
+
+app.use(
+  "/api-docs",
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerSpec)
 );
 
 app.use((req, res) => {
