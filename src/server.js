@@ -1,4 +1,10 @@
+
 require("dotenv").config();
+
+const express = require("express");
+const cors = require("cors");
+const helmet = require("helmet");
+const morgan = require("morgan");
 
 const swaggerUi =
   require("swagger-ui-express");
@@ -6,39 +12,32 @@ const swaggerUi =
 const swaggerSpec =
   require("./swagger");
 
-const express = require("express");
-const cors = require("cors");
-
 const pacientesRoutes =
   require("./routes/pacientesRoutes");
 
 const especialidadesRoutes =
-  require(
-    "./routes/especialidadesRoutes"
-  );
+  require("./routes/especialidadesRoutes");
 
 const clinicasRoutes =
   require("./routes/clinicasRoutes");
 
 const profissionaisRoutes =
-  require(
-    "./routes/profissionaisRoutes"
-  );
+  require("./routes/profissionaisRoutes");
 
 const disponibilidadesRoutes =
-  require(
-    "./routes/disponibilidadesRoutes"
-  );
+  require("./routes/disponibilidadesRoutes");
 
 const agendamentosRoutes =
-  require(
-    "./routes/agendamentosRoutes"
-  );
+  require("./routes/agendamentosRoutes");
 
 const authRoutes =
   require("./routes/authRoutes");
 
 const app = express();
+
+app.use(helmet());
+
+app.use(morgan("dev"));
 
 app.use(cors());
 
@@ -50,6 +49,12 @@ app.get("/", (req, res) => {
       "API Consulta Fácil funcionando"
   });
 });
+
+app.use(
+  "/api-docs",
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerSpec)
+);
 
 app.use(
   "/auth",
@@ -84,12 +89,6 @@ app.use(
 app.use(
   "/agendamentos",
   agendamentosRoutes
-);
-
-app.use(
-  "/api-docs",
-  swaggerUi.serve,
-  swaggerUi.setup(swaggerSpec)
 );
 
 app.use((req, res) => {

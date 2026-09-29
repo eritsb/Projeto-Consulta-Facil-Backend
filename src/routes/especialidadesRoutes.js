@@ -1,41 +1,61 @@
 const express = require("express");
 
-const EspecialidadesController =
-  require(
-    "../controllers/especialidadesController"
-  );
+const ClinicasController =
+  require("../controllers/clinicasController");
 
 const router = express.Router();
 
 /**
  * @swagger
- * /especialidades:
+ * /clinicas:
  *   get:
- *     summary: Lista todas as especialidades
+ *     summary: Lista todas as clínicas
+ *     description: Retorna todas as clínicas cadastradas na plataforma.
  *     tags:
- *       - Especialidades
+ *       - Clínicas
  *     responses:
  *       200:
- *         description: Lista de especialidades retornada com sucesso
+ *         description: Lista de clínicas retornada com sucesso
  */
-
 router.get(
   "/",
-  EspecialidadesController.listar
-);
-
-router.get(
-  "/:id",
-  EspecialidadesController.buscarPorId
+  ClinicasController.listar
 );
 
 /**
  * @swagger
- * /especialidades:
- *   post:
- *     summary: Cadastra uma especialidade
+ * /clinicas/{id}:
+ *   get:
+ *     summary: Busca uma clínica pelo ID
+ *     description: Retorna os dados de uma clínica específica.
  *     tags:
- *       - Especialidades
+ *       - Clínicas
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           example: 1
+ *     responses:
+ *       200:
+ *         description: Clínica encontrada
+ *       404:
+ *         description: Clínica não encontrada
+ */
+router.get(
+  "/:id",
+  ClinicasController.buscarPorId
+);
+
+/**
+ * @swagger
+ * /clinicas:
+ *   post:
+ *     summary: Cadastra uma clínica
+ *     description: Cria uma nova clínica no sistema.
+ *     tags:
+ *       - Clínicas
  *     requestBody:
  *       required: true
  *       content:
@@ -45,26 +65,83 @@ router.get(
  *             properties:
  *               nome:
  *                 type: string
- *               descricao:
+ *               cnpj:
  *                 type: string
+ *               telefone:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               endereco:
+ *                 type: string
+ *               horario_funcionamento:
+ *                 type: string
+ *               ativo:
+ *                 type: boolean
  *     responses:
  *       201:
- *         description: Especialidade cadastrada com sucesso
+ *         description: Clínica cadastrada com sucesso
+ *       400:
+ *         description: Dados inválidos
+ *       409:
+ *         description: CNPJ já cadastrado
  */
-
 router.post(
   "/",
-  EspecialidadesController.cadastrar
+  ClinicasController.cadastrar
 );
 
+/**
+ * @swagger
+ * /clinicas/{id}:
+ *   put:
+ *     summary: Atualiza uma clínica
+ *     description: Atualiza os dados de uma clínica existente.
+ *     tags:
+ *       - Clínicas
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           example: 1
+ *     responses:
+ *       200:
+ *         description: Clínica atualizada com sucesso
+ *       404:
+ *         description: Clínica não encontrada
+ */
 router.put(
   "/:id",
-  EspecialidadesController.atualizar
+  ClinicasController.atualizar
 );
 
+/**
+ * @swagger
+ * /clinicas/{id}:
+ *   delete:
+ *     summary: Exclui uma clínica
+ *     description: Remove uma clínica do sistema.
+ *     tags:
+ *       - Clínicas
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           example: 1
+ *     responses:
+ *       200:
+ *         description: Clínica excluída com sucesso
+ *       404:
+ *         description: Clínica não encontrada
+ *       409:
+ *         description: Clínica vinculada a profissionais ou especialidades
+ */
 router.delete(
   "/:id",
-  EspecialidadesController.excluir
+  ClinicasController.excluir
 );
 
 module.exports = router;
