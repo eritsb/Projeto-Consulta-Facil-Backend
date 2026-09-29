@@ -1,8 +1,13 @@
 const bcrypt = require("bcryptjs");
-const Pacientes = require("../models/Pacientes");
+
+const Pacientes =
+  require("../models/Pacientes");
 
 class PacientesService {
-  static criarErro(mensagem, statusCode) {
+  static criarErro(
+    mensagem,
+    statusCode
+  ) {
     const erro = new Error(mensagem);
     erro.statusCode = statusCode;
 
@@ -12,7 +17,10 @@ class PacientesService {
   static validarId(id) {
     const idNumerico = Number(id);
 
-    if (!Number.isInteger(idNumerico) || idNumerico <= 0) {
+    if (
+      !Number.isInteger(idNumerico) ||
+      idNumerico <= 0
+    ) {
       throw this.criarErro(
         "ID do paciente inválido",
         400
@@ -23,11 +31,14 @@ class PacientesService {
   }
 
   static limparCpf(cpf) {
-    return String(cpf).replace(/\D/g, "");
+    return String(cpf)
+      .replace(/\D/g, "");
   }
 
   static normalizarEmail(email) {
-    return String(email).trim().toLowerCase();
+    return String(email)
+      .trim()
+      .toLowerCase();
   }
 
   static validarCpf(cpf) {
@@ -40,7 +51,8 @@ class PacientesService {
   }
 
   static validarEmail(email) {
-    const formatoEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const formatoEmail =
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     if (!formatoEmail.test(email)) {
       throw this.criarErro(
@@ -51,9 +63,9 @@ class PacientesService {
   }
 
   static validarSenha(senha) {
-    if (String(senha).length < 6) {
+    if (String(senha).length < 8) {
       throw this.criarErro(
-        "A senha deve possuir pelo menos 6 caracteres",
+        "A senha deve possuir pelo menos 8 caracteres",
         400
       );
     }
@@ -64,14 +76,19 @@ class PacientesService {
   }
 
   static async buscarPorNome(nome) {
-    return await Pacientes.buscarPorNome(nome);
+    return await Pacientes.buscarPorNome(
+      String(nome).trim()
+    );
   }
 
   static async buscarPorId(id) {
-    const idPaciente = this.validarId(id);
+    const idPaciente =
+      this.validarId(id);
 
     const paciente =
-      await Pacientes.buscarPorId(idPaciente);
+      await Pacientes.buscarPorId(
+        idPaciente
+      );
 
     if (!paciente) {
       throw this.criarErro(
@@ -107,7 +124,9 @@ class PacientesService {
       );
     }
 
-    const cpfLimpo = this.limparCpf(cpf);
+    const cpfLimpo =
+      this.limparCpf(cpf);
+
     const emailNormalizado =
       this.normalizarEmail(email);
 
@@ -116,10 +135,11 @@ class PacientesService {
     this.validarSenha(senha);
 
     const pacienteExistente =
-      await Pacientes.buscarPorCpfOuEmail(
-        cpfLimpo,
-        emailNormalizado
-      );
+      await Pacientes
+        .buscarPorCpfOuEmail(
+          cpfLimpo,
+          emailNormalizado
+        );
 
     if (pacienteExistente) {
       throw this.criarErro(
@@ -128,29 +148,46 @@ class PacientesService {
       );
     }
 
-    const senhaHash = await bcrypt.hash(
-      String(senha),
-      10
-    );
+    const senhaHash =
+      await bcrypt.hash(
+        String(senha),
+        10
+      );
 
     return await Pacientes.cadastrar({
       nome: String(nome).trim(),
       cpf: cpfLimpo,
       data_nascimento,
-      telefone: telefone || null,
+
+      telefone:
+        telefone !== undefined &&
+        telefone !== ""
+          ? String(telefone).trim()
+          : null,
+
       email: emailNormalizado,
       senha_hash: senhaHash,
-      endereco: endereco || null
+
+      endereco:
+        endereco !== undefined &&
+        endereco !== ""
+          ? String(endereco).trim()
+          : null,
+
+      perfil: "PACIENTE",
+      ativo: true
     });
   }
 
   static async atualizar(id, dados) {
-    const idPaciente = this.validarId(id);
+    const idPaciente =
+      this.validarId(id);
 
     const pacienteAtual =
-      await Pacientes.buscarCompletoPorId(
-        idPaciente
-      );
+      await Pacientes
+        .buscarCompletoPorId(
+          idPaciente
+        );
 
     if (!pacienteAtual) {
       throw this.criarErro(
@@ -170,40 +207,47 @@ class PacientesService {
       ativo
     } = dados;
 
-    const novoCpf = cpf
-      ? this.limparCpf(cpf)
-      : pacienteAtual.cpf;
+    const novoCpf =
+      cpf !== undefined
+        ? this.limparCpf(cpf)
+        : pacienteAtual.cpf;
 
-    const novoEmail = email
-      ? this.normalizarEmail(email)
-      : pacienteAtual.email;
+    const novoEmail =
+      email !== undefined
+        ? this.normalizarEmail(email)
+        : pacienteAtual.email;
 
     this.validarCpf(novoCpf);
     this.validarEmail(novoEmail);
 
-    const pacienteDuplicado =
+    const duplicado =
       await Pacientes.buscarDuplicado(
         novoCpf,
         novoEmail,
         idPaciente
       );
 
-    if (pacienteDuplicado) {
+    if (duplicado) {
       throw this.criarErro(
         "CPF ou e-mail utilizado por outro paciente",
         409
       );
     }
 
-    let senhaHash = pacienteAtual.senha_hash;
+    let senhaHash =
+      pacienteAtual.senha_hash;
 
-    if (senha !== undefined && senha !== "") {
+    if (
+      senha !== undefined &&
+      senha !== ""
+    ) {
       this.validarSenha(senha);
 
-      senhaHash = await bcrypt.hash(
-        String(senha),
-        10
-      );
+      senhaHash =
+        await bcrypt.hash(
+          String(senha),
+          10
+        );
     }
 
     return await Pacientes.atualizar(
@@ -219,35 +263,44 @@ class PacientesService {
         data_nascimento:
           data_nascimento !== undefined
             ? data_nascimento
-            : pacienteAtual.data_nascimento,
+            : pacienteAtual
+                .data_nascimento,
 
         telefone:
           telefone !== undefined
-            ? telefone
+            ? telefone === null ||
+              String(telefone).trim() === ""
+              ? null
+              : String(telefone).trim()
             : pacienteAtual.telefone,
 
         email: novoEmail,
-
         senha_hash: senhaHash,
 
         endereco:
           endereco !== undefined
-            ? endereco
+            ? endereco === null ||
+              String(endereco).trim() === ""
+              ? null
+              : String(endereco).trim()
             : pacienteAtual.endereco,
 
         ativo:
           ativo !== undefined
-            ? ativo
+            ? Boolean(ativo)
             : pacienteAtual.ativo
       }
     );
   }
 
   static async excluir(id) {
-    const idPaciente = this.validarId(id);
+    const idPaciente =
+      this.validarId(id);
 
     const paciente =
-      await Pacientes.excluir(idPaciente);
+      await Pacientes.excluir(
+        idPaciente
+      );
 
     if (!paciente) {
       throw this.criarErro(

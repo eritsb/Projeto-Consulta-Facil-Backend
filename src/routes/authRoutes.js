@@ -15,8 +15,16 @@ const router = express.Router();
  * @swagger
  * /auth/login:
  *   post:
- *     summary: Realiza o login do paciente
- *     description: Autentica o paciente por e-mail e senha e retorna um token JWT.
+ *     summary: Realiza autenticação do usuário
+ *     description: |
+ *       Permite login utilizando e-mail e senha.
+ *
+ *       Perfis suportados:
+ *       - PACIENTE
+ *       - PROFISSIONAL
+ *       - ADMIN
+ *
+ *       Retorna um token JWT para utilização nas rotas protegidas.
  *     tags:
  *       - Autenticação
  *     requestBody:
@@ -32,47 +40,19 @@ const router = express.Router();
  *               email:
  *                 type: string
  *                 format: email
- *                 example: rejane@email.com
+ *                 example: admin@consultafacil.com
  *               senha:
  *                 type: string
- *                 format: password
- *                 minLength: 6
- *                 example: "123456"
+ *                 example: Admin@123
  *     responses:
  *       200:
  *         description: Login realizado com sucesso
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 mensagem:
- *                   type: string
- *                   example: Login realizado com sucesso
- *                 token:
- *                   type: string
- *                   example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
- *                 usuario:
- *                   type: object
- *                   properties:
- *                     id_paciente:
- *                       type: integer
- *                       example: 2
- *                     nome:
- *                       type: string
- *                       example: Rejane Mendonca
- *                     email:
- *                       type: string
- *                       example: rejane@email.com
- *                     perfil:
- *                       type: string
- *                       example: PACIENTE
  *       400:
- *         description: E-mail ou senha não informados ou e-mail inválido
+ *         description: Dados inválidos
  *       401:
- *         description: E-mail ou senha inválidos
+ *         description: Credenciais inválidas
  *       403:
- *         description: Conta de paciente inativa
+ *         description: Usuário inativo
  *       500:
  *         description: Erro interno do servidor
  */
@@ -85,60 +65,38 @@ router.post(
  * @swagger
  * /auth/perfil:
  *   get:
- *     summary: Consulta o perfil do paciente autenticado
- *     description: Valida o token JWT e retorna os dados do paciente autenticado.
+ *     summary: Retorna os dados do usuário autenticado
+ *     description: |
+ *       Retorna as informações do usuário autenticado utilizando o token JWT.
+ *
+ *       Perfis permitidos:
+ *       - PACIENTE
+ *       - PROFISSIONAL
+ *       - ADMIN
  *     tags:
  *       - Autenticação
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Perfil do paciente encontrado
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 id_paciente:
- *                   type: integer
- *                   example: 2
- *                 nome:
- *                   type: string
- *                   example: Rejane Mendonca
- *                 cpf:
- *                   type: string
- *                   example: "12345678901"
- *                 data_nascimento:
- *                   type: string
- *                   format: date-time
- *                 telefone:
- *                   type: string
- *                   example: "81999999999"
- *                 email:
- *                   type: string
- *                   example: rejane@email.com
- *                 endereco:
- *                   type: string
- *                   example: Recife - PE
- *                 ativo:
- *                   type: boolean
- *                   example: true
- *                 perfil:
- *                   type: string
- *                   example: PACIENTE
+ *         description: Perfil retornado com sucesso
  *       401:
- *         description: Token não informado, inválido ou expirado
+ *         description: Token inválido ou expirado
  *       403:
- *         description: Usuário sem permissão para acessar o recurso
+ *         description: Usuário não autorizado
  *       404:
- *         description: Paciente não encontrado
+ *         description: Usuário não encontrado
  *       500:
  *         description: Erro interno do servidor
  */
 router.get(
   "/perfil",
   autenticacao,
-  autorizarPerfis("PACIENTE"),
+  autorizarPerfis(
+    "PACIENTE",
+    "PROFISSIONAL",
+    "ADMIN"
+  ),
   AuthController.perfil
 );
 

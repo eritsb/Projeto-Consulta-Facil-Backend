@@ -46,14 +46,15 @@ class AuthController {
 
   static async perfil(req, res) {
     try {
-      const paciente =
+      const usuario =
         await AuthService.obterPerfil(
-          req.usuario.id
+          req.usuario.id,
+          req.usuario.perfil
         );
 
       return res
         .status(200)
-        .json(paciente);
+        .json(usuario);
     } catch (error) {
       return AuthController.tratarErro(
         error,
