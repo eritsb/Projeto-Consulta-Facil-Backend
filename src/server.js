@@ -33,6 +33,9 @@ const agendamentosRoutes =
 const authRoutes =
   require("./routes/authRoutes");
 
+const administradoresRoutes =
+  require("./routes/administradoresRoutes");
+
 const app = express();
 
 app.use(helmet());
@@ -89,6 +92,11 @@ app.use(
 app.use(
   "/agendamentos",
   agendamentosRoutes
+);
+
+app.use(
+  "/administradores",
+  administradoresRoutes
 );
 
 app.use((req, res) => {

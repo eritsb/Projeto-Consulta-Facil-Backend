@@ -1,5 +1,4 @@
-const sql =
-  require("../config/database");
+const sql = require("../config/database");
 
 class Pacientes {
   static async listarTodos() {
@@ -12,6 +11,7 @@ class Pacientes {
         telefone,
         email,
         endereco,
+        perfil,
         ativo,
         data_cadastro
       FROM pacientes
@@ -19,24 +19,25 @@ class Pacientes {
     `;
   }
 
- static async buscarPorNome(nome) {
+  static async buscarPorNome(nome) {
     return await sql`
-        SELECT
-            id_paciente,
-            nome,
-            cpf,
-            data_nascimento,
-            telefone,
-            email,
-            endereco,
-            ativo,
-            data_cadastro
-        FROM pacientes
-        WHERE nome ILIKE ${"%" + nome + "%"}
-        ORDER BY nome
+      SELECT
+        id_paciente,
+        nome,
+        cpf,
+        data_nascimento,
+        telefone,
+        email,
+        endereco,
+        perfil,
+        ativo,
+        data_cadastro
+      FROM pacientes
+      WHERE nome ILIKE ${"%" + nome + "%"}
+      ORDER BY nome
     `;
-}
-  
+  }
+
   static async buscarPorId(id) {
     const resultado = await sql`
       SELECT
@@ -47,6 +48,7 @@ class Pacientes {
         telefone,
         email,
         endereco,
+        perfil,
         ativo,
         data_cadastro
       FROM pacientes
@@ -67,6 +69,7 @@ class Pacientes {
         email,
         senha_hash,
         endereco,
+        perfil,
         ativo,
         data_cadastro
       FROM pacientes
@@ -100,8 +103,7 @@ class Pacientes {
     idPaciente
   ) {
     const resultado = await sql`
-      SELECT
-        id_paciente
+      SELECT id_paciente
       FROM pacientes
       WHERE (
         cpf = ${cpf}
@@ -122,7 +124,9 @@ class Pacientes {
       telefone,
       email,
       senha_hash,
-      endereco
+      endereco,
+      perfil,
+      ativo
     } = dados;
 
     const resultado = await sql`
@@ -133,7 +137,9 @@ class Pacientes {
         telefone,
         email,
         senha_hash,
-        endereco
+        endereco,
+        perfil,
+        ativo
       )
       VALUES (
         ${nome},
@@ -142,7 +148,9 @@ class Pacientes {
         ${telefone},
         ${email},
         ${senha_hash},
-        ${endereco}
+        ${endereco},
+        ${perfil},
+        ${ativo}
       )
       RETURNING
         id_paciente,
@@ -152,6 +160,7 @@ class Pacientes {
         telefone,
         email,
         endereco,
+        perfil,
         ativo,
         data_cadastro
     `;
@@ -181,6 +190,7 @@ class Pacientes {
         email = ${email},
         senha_hash = ${senha_hash},
         endereco = ${endereco},
+        perfil = 'PACIENTE',
         ativo = ${ativo}
       WHERE id_paciente = ${id}
       RETURNING
@@ -191,6 +201,7 @@ class Pacientes {
         telefone,
         email,
         endereco,
+        perfil,
         ativo,
         data_cadastro
     `;
@@ -204,14 +215,16 @@ class Pacientes {
       WHERE id_paciente = ${id}
       RETURNING
         id_paciente,
-        nome
+        nome,
+        perfil
     `;
 
     return resultado[0];
   }
 
-  static async buscarPorEmailParaLogin(email) {
-  
+  static async buscarPorEmailParaLogin(
+    email
+  ) {
     const resultado = await sql`
       SELECT
         id_paciente,
@@ -219,19 +232,15 @@ class Pacientes {
         cpf,
         email,
         senha_hash,
+        perfil,
         ativo
       FROM pacientes
-  
-      WHERE LOWER(email) =
-            LOWER(${email})
-  
+      WHERE LOWER(email) = LOWER(${email})
       LIMIT 1
     `;
-  
-    return resultado[0];
-  
-  }
 
+    return resultado[0];
+  }
 }
 
 module.exports = Pacientes;
