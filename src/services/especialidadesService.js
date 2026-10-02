@@ -34,6 +34,12 @@ class EspecialidadesService {
     return await Especialidades.listarTodos();
   }
 
+  static async buscarPorNome(nome) {
+  return await Especialidades.pesquisarPorNome(
+    String(nome).trim()
+  );
+}
+
   static async buscarPorId(id) {
     const idEspecialidade =
       this.validarId(id);

@@ -32,24 +32,29 @@ class EspecialidadesController {
       });
   }
 
-  static async listar(req, res) {
-    try {
-      const especialidades =
-        await EspecialidadesService
-          .listarTodos();
+static async listar(req, res) {
+  try {
 
-      return res
-        .status(200)
-        .json(especialidades);
-    } catch (error) {
-      return EspecialidadesController
-        .tratarErro(
-          error,
-          res,
-          "Erro interno ao listar especialidades"
-        );
-    }
+    const { nome } = req.query;
+
+    const especialidades = nome
+      ? await EspecialidadesService.buscarPorNome(nome)
+      : await EspecialidadesService.listarTodos();
+
+    return res
+      .status(200)
+      .json(especialidades);
+
+  } catch (error) {
+
+    return EspecialidadesController.tratarErro(
+      error,
+      res,
+      "Erro interno ao listar especialidades"
+    );
+
   }
+}
 
   static async buscarPorId(req, res) {
     try {

@@ -13,6 +13,19 @@ class Especialidades {
     `;
   }
 
+  static async pesquisarPorNome(nome) {
+  return await sql`
+    SELECT
+      id_especialidade,
+      nome,
+      descricao,
+      ativo
+    FROM especialidades
+    WHERE nome ILIKE ${"%" + nome + "%"}
+    ORDER BY nome
+  `;
+}
+
   static async buscarPorId(id) {
     const resultado = await sql`
       SELECT

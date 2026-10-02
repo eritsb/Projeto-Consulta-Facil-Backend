@@ -32,23 +32,29 @@ class ClinicasController {
       });
   }
 
-  static async listar(req, res) {
-    try {
-      const clinicas =
-        await ClinicasService.listarTodas();
+static async listar(req, res) {
+  try {
 
-      return res
-        .status(200)
-        .json(clinicas);
-    } catch (error) {
-      return ClinicasController.tratarErro(
-        error,
-        res,
-        "Erro interno ao listar clínicas"
-      );
-    }
+    const { nome } = req.query;
+
+    const clinicas = nome
+      ? await ClinicasService.buscarPorNome(nome)
+      : await ClinicasService.listarTodas();
+
+    return res
+      .status(200)
+      .json(clinicas);
+
+  } catch (error) {
+
+    return ClinicasController.tratarErro(
+      error,
+      res,
+      "Erro interno ao listar clínicas"
+    );
+
   }
-
+}
   static async buscarPorId(req, res) {
     try {
       const clinica =

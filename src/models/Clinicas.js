@@ -35,6 +35,23 @@ class Clinicas {
     return resultado[0];
   }
 
+  static async buscarPorNome(nome) {
+  return await sql`
+    SELECT
+      id_clinica,
+      nome,
+      cnpj,
+      telefone,
+      email,
+      endereco,
+      horario_funcionamento,
+      ativo
+    FROM clinicas
+    WHERE nome ILIKE ${"%" + nome + "%"}
+    ORDER BY nome
+  `;
+}
+
   static async buscarPorCnpj(cnpj) {
     const resultado = await sql`
       SELECT
