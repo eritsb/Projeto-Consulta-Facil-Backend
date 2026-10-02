@@ -61,6 +61,12 @@ class ClinicasService {
     return await Clinicas.listarTodas();
   }
 
+  static async buscarPorNome(nome) {
+  return await Clinicas.buscarPorNome(
+    String(nome).trim()
+  );
+}
+
   static async buscarPorId(id) {
     const idClinica = this.validarId(id);
 
