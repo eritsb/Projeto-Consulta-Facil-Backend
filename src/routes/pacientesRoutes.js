@@ -96,7 +96,7 @@ router.get(
  *                 example: maria@email.com
  *               senha:
  *                 type: string
- *                 example: "123456"
+ *                 example: "12345678"
  *               endereco:
  *                 type: string
  *                 example: Recife - PE
