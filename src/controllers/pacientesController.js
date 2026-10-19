@@ -31,23 +31,6 @@ class PacientesController {
             : mensagemPadrao
       });
   }
-
-  // static async listar(req, res) {
-  //   try {
-  //     const pacientes =
-  //       await PacientesService.listarTodos();
-
-  //     return res.status(200).json(pacientes);
-  //   } catch (error) {
-  //     return PacientesController.tratarErro(
-  //       error,
-  //       res,
-  //       "Erro interno ao listar pacientes"
-  //     );
-  //   }
-  // }
-
-  //modifiquei essa parte paa a api receber o query e devolver o valor = nome. a verõ anterior ta comentada
   
   static async listar(req, res) {
     try {
