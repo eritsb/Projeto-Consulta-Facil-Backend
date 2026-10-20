@@ -95,6 +95,8 @@ router.get(
  *               - cpf
  *               - registro_profissional
  *               - conselho
+ *               - telefone
+ *               - senha
  *             properties:
  *               id_clinica:
  *                 type: integer
@@ -120,6 +122,9 @@ router.get(
  *               email:
  *                 type: string
  *                 example: joao@clinica.com
+ *              senha:
+ *                 type: string
+ *                 example: "12345678"
  *     responses:
  *       201:
  *         description: Profissional cadastrado com sucesso
