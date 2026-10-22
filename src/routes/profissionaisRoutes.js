@@ -1,12 +1,10 @@
 const express = require("express");
 
-const router =
-  express.Router();
+const router = express.Router();
 
-const ProfissionaisController =
-  require(
-    "../controllers/profissionaisController"
-  );
+const ProfissionaisController = require(
+  "../controllers/profissionaisController"
+);
 
 /**
  * @swagger
@@ -121,9 +119,11 @@ router.get(
  *                 example: "81999999999"
  *               email:
  *                 type: string
+ *                 format: email
  *                 example: joao@clinica.com
- *              senha:
+ *               senha:
  *                 type: string
+ *                 format: password
  *                 example: "12345678"
  *     responses:
  *       201:
@@ -154,11 +154,51 @@ router.post(
  *         schema:
  *           type: integer
  *           example: 1
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               id_clinica:
+ *                 type: integer
+ *                 example: 1
+ *               id_especialidade:
+ *                 type: integer
+ *                 example: 1
+ *               nome:
+ *                 type: string
+ *                 example: João Silva
+ *               cpf:
+ *                 type: string
+ *                 example: "11122233344"
+ *               registro_profissional:
+ *                 type: string
+ *                 example: "12345"
+ *               conselho:
+ *                 type: string
+ *                 example: CRM-PE
+ *               telefone:
+ *                 type: string
+ *                 example: "81999999999"
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: joao@clinica.com
+ *               senha:
+ *                 type: string
+ *                 format: password
+ *                 example: "12345678"
  *     responses:
  *       200:
  *         description: Profissional atualizado com sucesso
+ *       400:
+ *         description: Dados inválidos
  *       404:
  *         description: Profissional não encontrado
+ *       409:
+ *         description: CPF ou registro profissional já cadastrado
  */
 router.put(
   "/:id",
