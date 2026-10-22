@@ -1,35 +1,35 @@
 const express = require("express");
 
-const ClinicasController =
-  require("../controllers/clinicasController");
+const EspecialidadesController =
+  require("../controllers/especialidadesController");
 
 const router = express.Router();
 
 /**
  * @swagger
- * /clinicas:
+ * /especialidades:
  *   get:
- *     summary: Lista todas as clínicas
- *     description: Retorna todas as clínicas cadastradas na plataforma.
+ *     summary: Lista todas as especialidades
+ *     description: Retorna todas as especialidades cadastradas na plataforma.
  *     tags:
- *       - Clínicas
+ *       - Especialidades
  *     responses:
  *       200:
- *         description: Lista de clínicas retornada com sucesso
+ *         description: Lista de especialidades retornada com sucesso
  */
 router.get(
   "/",
-  ClinicasController.listar
+  EspecialidadesController.listar
 );
 
 /**
  * @swagger
- * /clinicas/{id}:
+ * /especialidades/{id}:
  *   get:
- *     summary: Busca uma clínica pelo ID
- *     description: Retorna os dados de uma clínica específica.
+ *     summary: Busca uma especialidade pelo ID
+ *     description: Retorna os dados de uma especialidade específica.
  *     tags:
- *       - Clínicas
+ *       - Especialidades
  *     parameters:
  *       - in: path
  *         name: id
@@ -39,23 +39,69 @@ router.get(
  *           example: 1
  *     responses:
  *       200:
- *         description: Clínica encontrada
+ *         description: Especialidade encontrada
  *       404:
- *         description: Clínica não encontrada
+ *         description: Especialidade não encontrada
  */
 router.get(
   "/:id",
-  ClinicasController.buscarPorId
+  EspecialidadesController.buscarPorId
 );
 
 /**
  * @swagger
- * /clinicas:
+ * /especialidades:
  *   post:
- *     summary: Cadastra uma clínica
- *     description: Cria uma nova clínica no sistema.
+ *     summary: Cadastra uma especialidade
+ *     description: Cria uma nova especialidade no sistema.
  *     tags:
- *       - Clínicas
+ *       - Especialidades
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - nome
+ *             properties:
+ *               nome:
+ *                 type: string
+ *                 example: Cardiologia
+ *               descricao:
+ *                 type: string
+ *                 example: Especialidade responsável pelo diagnóstico e tratamento de doenças cardiovasculares.
+ *               ativo:
+ *                 type: boolean
+ *                 example: true
+ *     responses:
+ *       201:
+ *         description: Especialidade cadastrada com sucesso
+ *       400:
+ *         description: Dados inválidos
+ *       409:
+ *         description: Especialidade já cadastrada
+ */
+router.post(
+  "/",
+  EspecialidadesController.cadastrar
+);
+
+/**
+ * @swagger
+ * /especialidades/{id}:
+ *   put:
+ *     summary: Atualiza uma especialidade
+ *     description: Atualiza os dados de uma especialidade existente.
+ *     tags:
+ *       - Especialidades
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           example: 1
  *     requestBody:
  *       required: true
  *       content:
@@ -65,65 +111,36 @@ router.get(
  *             properties:
  *               nome:
  *                 type: string
- *               cnpj:
+ *                 example: Cardiologia
+ *               descricao:
  *                 type: string
- *               telefone:
- *                 type: string
- *               email:
- *                 type: string
- *               endereco:
- *                 type: string
- *               horario_funcionamento:
- *                 type: string
+ *                 example: Especialidade responsável pelo diagnóstico e tratamento de doenças cardiovasculares.
  *               ativo:
  *                 type: boolean
- *     responses:
- *       201:
- *         description: Clínica cadastrada com sucesso
- *       400:
- *         description: Dados inválidos
- *       409:
- *         description: CNPJ já cadastrado
- */
-router.post(
-  "/",
-  ClinicasController.cadastrar
-);
-
-/**
- * @swagger
- * /clinicas/{id}:
- *   put:
- *     summary: Atualiza uma clínica
- *     description: Atualiza os dados de uma clínica existente.
- *     tags:
- *       - Clínicas
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *           example: 1
+ *                 example: true
  *     responses:
  *       200:
- *         description: Clínica atualizada com sucesso
+ *         description: Especialidade atualizada com sucesso
+ *       400:
+ *         description: Dados inválidos
  *       404:
- *         description: Clínica não encontrada
+ *         description: Especialidade não encontrada
+ *       409:
+ *         description: Especialidade já cadastrada
  */
 router.put(
   "/:id",
-  ClinicasController.atualizar
+  EspecialidadesController.atualizar
 );
 
 /**
  * @swagger
- * /clinicas/{id}:
+ * /especialidades/{id}:
  *   delete:
- *     summary: Exclui uma clínica
- *     description: Remove uma clínica do sistema.
+ *     summary: Exclui uma especialidade
+ *     description: Remove uma especialidade do sistema.
  *     tags:
- *       - Clínicas
+ *       - Especialidades
  *     parameters:
  *       - in: path
  *         name: id
@@ -133,15 +150,15 @@ router.put(
  *           example: 1
  *     responses:
  *       200:
- *         description: Clínica excluída com sucesso
+ *         description: Especialidade excluída com sucesso
  *       404:
- *         description: Clínica não encontrada
+ *         description: Especialidade não encontrada
  *       409:
- *         description: Clínica vinculada a profissionais ou especialidades
+ *         description: Especialidade vinculada a profissionais ou clínicas
  */
 router.delete(
   "/:id",
-  ClinicasController.excluir
+  EspecialidadesController.excluir
 );
 
 module.exports = router;
