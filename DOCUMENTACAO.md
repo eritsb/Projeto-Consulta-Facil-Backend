@@ -9,7 +9,7 @@ PT-BR
 
 ## 1. Visão geral
 
-O **Consulta Fácil** é o backend de uma plataforma de gerenciamento e agendamento de consultas médicas, desenvolvido como Projeto Integrador do SENAC. A aplicação expõe uma API REST responsável por cadastros administrativos, autenticação de usuários e pelo ciclo completo de agendamento de consultas.
+Back-end da plataforma de gerenciamento e agendamento de consultas médicas (Consulta fácil), desenvolvido como Projeto Integrador do SENAC. A aplicação expõe uma API REST responsável por cadastros administrativos, autenticação de usuários e pelo ciclo completo de agendamento de consultas.
 
 O escopo implementado no código inclui:
 
