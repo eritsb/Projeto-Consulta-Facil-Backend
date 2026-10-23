@@ -1,13 +1,8 @@
 # Consulta Fácil — Documentação Técnica do Backend
 
 > **Repositório:** https://github.com/eritsb/Projeto-Consulta-Facil-Backend
-> **Branch analisada:** `backend-rejane`
-> **Commit de referência:** `b4e28f8`
 > **Data da análise:** 23/10/2026
 > **Idiomas:** Português (Brasil) e English
-
-Este documento foi refeito a partir da estrutura real da branch `backend-rejane` e substitui o conteúdo anterior de `DOCUMENTACAO.md` da branch `back-end-ericha`. Foram removidas tecnologias, tabelas e funcionalidades que não existem no código atual.
-
 ---
 
 # PARTE 1 — PORTUGUÊS (BR)
