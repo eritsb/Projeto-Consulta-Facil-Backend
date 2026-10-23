@@ -217,7 +217,7 @@ Se `DATABASE_URL` não estiver definida, `src/config/database.js` lança erro na
 ```bash
 git clone https://github.com/eritsb/Projeto-Consulta-Facil-Backend.git
 cd Projeto-Consulta-Facil-Backend
-git checkout backend-rejane
+git checkout main
 npm install
 npm start
 ```
@@ -1040,50 +1040,7 @@ O schema do banco não é criado automaticamente pelo deploy. É necessário pro
 
 ---
 
-## 11. Aderência entre README e código
-
-| Afirmação do README | Evidência no código | Decisão nesta documentação |
-|---|---|---|
-| Tabelas listadas como implementadas sem model, query ou rota no código | A estrutura real contém apenas as tabelas usadas pelos models e pelo seed | Removidas da documentação de arquitetura |
-| Login apenas de pacientes | Login aceita `PACIENTE`, `PROFISSIONAL` e `ADMIN` | Corrigido para autenticação multi-perfil |
-| Swagger disponível | `swagger.js`, `swagger-ui-express` e anotações nas rotas | Confirmado e documentado |
-| Script de carga | O script atual é `seed.js`, executado diretamente no banco | Documentado |
-| Estrutura sem `administradores` | Existem model, service, controller e rotas de administradores | Adicionado à documentação |
-| Tecnologias sem `helmet`, `morgan`, `swagger-jsdoc` e `swagger-ui-express` | Todos estão instalados e em uso | Adicionados à stack |
-| Filtros de profissionais | `?nome`, `?clinica` e `?especialidade` implementados | Documentados |
-| Busca de pacientes por nome | `GET /pacientes?nome=` implementado | Documentada |
-| Busca de clínicas e especialidades por nome | Implementada no controller, mas ausente do Swagger | Documentada |
-| Disponibilidades por profissional | `GET /disponibilidades/profissional/:id` implementado | Documentada |
-| "PostgreSQL" | Driver real é `@neondatabase/serverless`; `pg` está instalado e sem uso | Esclarecido |
-| "MVC" | Camadas Routes/Controllers/Services/Models, sem views | Reclassificado como arquitetura em camadas |
-| "Validação de CPF" | Apenas comprimento de 11 dígitos | Precisado |
-| "Senhas criptografadas" | Hash bcrypt | Terminologia corrigida |
-| Deploy no Render | URL e Swagger responderam `200` | Verificado |
-| Deploy do banco e checklist da primeira entrega | Não há schema, migrations ou configuração de deploy no repo | Marcado como não verificável pelo repositório |
-| Node.js sem versão | Dependência exige `>= 19` | Adicionado |
-
----
-
-## 12. Pendências e próximos passos reais
-
-- Versionar o schema do banco (migrations ou `schema.sql`).
-- Criar testes automatizados (unitários de services e integração das rotas).
-- Proteger os CRUDs de negócio com JWT e autorização por perfil.
-- Restringir CORS e adicionar rate limiting e validação de entrada.
-- Padronizar respostas e o tratamento de erros, especialmente em profissionais, disponibilidades e administradores.
-- Implementar paginação e filtros nas listagens.
-- Implementar reagendamento.
-- Validar CPF/CNPJ com dígitos verificadores.
-- Impedir datas passadas e sobreposição de horários.
-- Adicionar troca de senha de administrador e verificação de e-mail duplicado no `PUT`.
-- Remover a dependência `pg` não utilizada (ou passá-la a ser usada).
-- Corrigir `main` no `package.json` para `src/server.js` ou remover o campo.
-- Documentar no Swagger os filtros `?nome` de clínicas e especialidades e os corpos completos de atualização.
-- Alinhar o README com a stack e as funcionalidades reais.
-
----
-
-## 13. Integrantes
+##  Integrantes
 
 Projeto desenvolvido para a disciplina de Projeto Integrador — SENAC.
 
@@ -1309,7 +1266,7 @@ If `DATABASE_URL` is missing, `src/config/database.js` throws during startup. If
 ```bash
 git clone https://github.com/eritsb/Projeto-Consulta-Facil-Backend.git
 cd Projeto-Consulta-Facil-Backend
-git checkout backend-rejane
+git checkout main
 npm install
 npm start
 ```
@@ -2132,50 +2089,7 @@ The database schema is not created automatically by the deployment. It must be p
 
 ---
 
-## 11. README vs. code adherence
-
-| README claim | Code evidence | Decision in this documentation |
-|---|---|---|
-| Tables listed as implemented without a model, query, or route in the code | The actual structure only contains tables used by the models and the seed | Removed from the architecture documentation |
-| Login only for patients | Login accepts `PACIENTE`, `PROFISSIONAL`, and `ADMIN` | Corrected to multi-profile authentication |
-| Swagger available | `swagger.js`, `swagger-ui-express`, and route annotations | Confirmed and documented |
-| Seed script | The current script is `seed.js`, executed directly against the database | Documented |
-| Structure without `administradores` | Administrator model, service, controller, and routes exist | Added to the documentation |
-| Stack without `helmet`, `morgan`, `swagger-jsdoc`, and `swagger-ui-express` | All are installed and used | Added to the stack |
-| Professional filters | `?nome`, `?clinica`, and `?especialidade` implemented | Documented |
-| Patient name search | `GET /pacientes?nome=` implemented | Documented |
-| Clinic and specialty name search | Implemented in the controller but missing from Swagger | Documented |
-| Availability by professional | `GET /disponibilidades/profissional/:id` implemented | Documented |
-| "PostgreSQL" | Actual driver is `@neondatabase/serverless`; `pg` is installed but unused | Clarified |
-| "MVC" | Routes/Controllers/Services/Models layers, no views | Reclassified as layered architecture |
-| "CPF validation" | Length of 11 digits only | Clarified |
-| "Encrypted passwords" | bcrypt hash | Terminology corrected |
-| Render deployment | URL and Swagger returned `200` | Verified |
-| Database deployment and first-delivery checklist | No schema, migrations, or deployment config in the repo | Marked as unverifiable from the repository |
-| Node.js without a version | Dependency requires `>= 19` | Added |
-
----
-
-## 12. Real pending items and next steps
-
-- Version the database schema (migrations or `schema.sql`).
-- Add automated tests (service unit tests and route integration tests).
-- Protect business CRUDs with JWT and profile-based authorization.
-- Restrict CORS and add rate limiting and input validation.
-- Standardize responses and error handling, especially for professionals, availability, and administrators.
-- Implement pagination and filters in listings.
-- Implement rescheduling.
-- Validate CPF/CNPJ check digits.
-- Prevent past dates and overlapping slots.
-- Add administrator password change and duplicate e-mail validation on `PUT`.
-- Remove the unused `pg` dependency (or start using it).
-- Fix `main` in `package.json` to `src/server.js` or remove the field.
-- Document the `?nome` filters for clinics and specialties and the full update bodies in Swagger.
-- Align the README with the actual stack and features.
-
----
-
-## 13. Contributors
+## Contributors
 
 Project developed for the SENAC Integrative Project course.
 
