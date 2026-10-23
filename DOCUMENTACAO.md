@@ -1,7 +1,9 @@
 # Consulta Fácil — Documentação Técnica do Backend
 
 > **Repositório:** https://github.com/eritsb/Projeto-Consulta-Facil-Backend
+
 > **Data da análise:** 23/10/2026
+
 > **Idiomas:** Português (Brasil) e English
 ---
 
