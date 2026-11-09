@@ -20,7 +20,7 @@ const options = {
         description: "Ambiente local"
       },
       {
-        url: "https://back-end-pi-ihs1.onrender.com",
+        url: "https://projeto-consulta-facil-backend.onrender.com",
         description: "Ambiente de produção"
       }
     ],
