@@ -320,6 +320,30 @@ Credenciais de teste:
 
 As disponibilidades e consultas da massa estão entre `2026-10-05` e `2026-10-12`. Os quatro primeiros agendamentos reservam as disponibilidades correspondentes.
 
+### 4.6 Testes unitários (`npm test`)
+
+A suíte formal roda com o runner nativo do Node, sem dependências extras (`node --test`):
+
+```bash
+npm test
+```
+
+| Arquivo | Cobertura |
+|---|---|
+| `__tests__/auth.test.js` | login e `obterPerfil`: campos obrigatórios, e-mail malformado, conta inativa, senha errada, e-mail em dois perfis, geração/decodificação do JWT |
+| `__tests__/pacientes.test.js` | validações (ID, CPF, senha), cadastro duplicado 409, normalização de CPF/e-mail, hash real de senha com bcrypt, isolamento por perfil |
+| `__tests__/triagens.test.js` | **IA falha → nada é salvo**; especialidade fora da lista → 422; IA ok → triagem + recomendação + notificação; recomendação falha → triagem criada é excluída; chatbot |
+| `__tests__/agendamentos.test.js` | reserva com 409 sem gravar, triagem de outro paciente 403, vinculação de triagem, tipos de notificação (`AGENDAMENTO_CRIADO/CONFIRMADO/ATUALIZADO/CANCELADO/REAGENDADO/EXCLUIDO`) e as regras do reagendamento (dono, estados, mesmo horário) |
+| `__tests__/notificacoes.test.js` | tipos permitidos, `notificar` engole falha do banco, e o gerador de lembretes (`gerarLembretes`): janela vazia, geração, idempotência e falha individual |
+
+Os testes **não tocam banco nem IA**: os métodos dos models (`Triagens`, `Agendamentos` etc.) são substituídos por stubs em cada arquivo (`__tests__/stubs.js`), e cada arquivo roda em um processo isolado do runner. `bcrypt` e `jwt` são reais. A suíte também não precisa de `.env`.
+
+Além disso valem as validações E2E documentadas em `DOCUMENTACAO.md`, contra banco Neon e IA Groq reais (triagem, chatbot, transcrição de áudio, agendamento, reagendamento, confirmação, cancelamento, exclusão e lembretes).
+
+### 4.7 Integração contínua (CI)
+
+`.github/workflows/ci.yml` roda a cada push/PR: instala dependências (`npm ci`), checa sintaxe de todos os `.js` rastreados com `node --check` e executa `npm test`. Sem segredos configurados: os unitários não exigem variáveis de ambiente.
+
 ---
 
 ## 5. Modelo de dados
@@ -1546,6 +1570,30 @@ Test credentials:
 | PACIENTE | `lucas.ferreira@consulta.com.br` | `123456` |
 
 Seeded availability and appointment dates range from `2026-10-05` to `2026-10-12`. The first four appointments reserve their corresponding slots.
+
+### 4.6 Unit tests (`npm test`)
+
+The formal suite runs with Node's native test runner, with no extra dependencies (`node --test`):
+
+```bash
+npm test
+```
+
+| File | Coverage |
+|---|---|
+| `__tests__/auth.test.js` | login and `obterPerfil`: required fields, malformed e-mail, inactive account, wrong password, same e-mail on two profiles, JWT generation/decoding |
+| `__tests__/pacientes.test.js` | validations (ID, CPF, password), duplicate registration 409, CPF/e-mail normalization, real bcrypt password hashing, per-profile isolation |
+| `__tests__/triagens.test.js` | **AI failure → nothing is saved**; specialty outside the list → 422; AI success → triage + recommendation + notification; recommendation failure → newly created triage is deleted; chatbot |
+| `__tests__/agendamentos.test.js` | booking with 409 without writing, another patient's triage 403, triage linkage, notification types (`AGENDAMENTO_CRIADO/CONFIRMADO/ATUALIZADO/CANCELADO/REAGENDADO/EXCLUIDO`) and reschedule rules (owner, states, same slot) |
+| `__tests__/notificacoes.test.js` | allowed types, `notificar` swallows database failures, and the reminder generator (`gerarLembretes`): empty window, generation, idempotency, per-item failure |
+
+Tests **do not touch the database or the AI**: model methods (`Triagens`, `Agendamentos`, etc.) are replaced by stubs on each file (`__tests__/stubs.js`), and each file runs in an isolated runner process. `bcrypt` and `jwt` are real. The suite does not require a `.env` file.
+
+The E2E validations documented in `DOCUMENTACAO.md` also apply, against real Neon database and Groq AI (triage, chatbot, audio transcription, booking, rescheduling, confirmation, cancellation, deletion and reminders).
+
+### 4.7 Continuous integration (CI)
+
+`.github/workflows/ci.yml` runs on every push/PR: installs dependencies (`npm ci`), checks the syntax of all tracked `.js` files with `node --check`, and runs `npm test`. No secrets required: the unit tests need no environment variables.
 
 ---
 

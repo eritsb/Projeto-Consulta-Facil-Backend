@@ -1,0 +1,38 @@
+# CI: roda os testes de unidade em cada push/Pull Request.
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main, backend-rejane]
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      # O projeto também mantém um inception de sintaxe simples:
+      # falha cedo se algum arquivo JS quebrou.
+      - name: Checar sintaxe dos arquivos JS
+        run: |
+          Erro=0
+          for f in $(git ls-files '*.js'); do
+            node --check "$f" || Erro=1
+          done
+          exit $Erro
+
+      - name: Testes de unidade (npm test)
+        run: npm test
