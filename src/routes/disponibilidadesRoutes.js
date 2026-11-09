@@ -3,6 +3,14 @@ const express = require("express");
 const DisponibilidadesController =
   require("../controllers/disponibilidadesController");
 
+const autenticacao = require(
+  "../middlewares/autenticacao"
+);
+
+const autorizarPerfis = require(
+  "../middlewares/autorizarPerfis"
+);
+
 const router = express.Router();
 
 /**
@@ -200,6 +208,8 @@ router.get(
  */
 router.post(
   "/",
+  autenticacao,
+  autorizarPerfis("ADMIN"),
   DisponibilidadesController.cadastrar
 );
 
@@ -263,6 +273,8 @@ router.post(
  */
 router.put(
   "/:id",
+  autenticacao,
+  autorizarPerfis("ADMIN"),
   DisponibilidadesController.atualizar
 );
 
@@ -294,6 +306,8 @@ router.put(
  */
 router.delete(
   "/:id",
+  autenticacao,
+  autorizarPerfis("ADMIN"),
   DisponibilidadesController.excluir
 );
 

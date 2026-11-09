@@ -5,6 +5,14 @@ const ClinicasController =
     "../controllers/clinicasController"
   );
 
+const autenticacao = require(
+  "../middlewares/autenticacao"
+);
+
+const autorizarPerfis = require(
+  "../middlewares/autorizarPerfis"
+);
+
 const router = express.Router();
 
 /**
@@ -101,6 +109,8 @@ router.get(
  */
 router.post(
   "/",
+  autenticacao,
+  autorizarPerfis("ADMIN"),
   ClinicasController.cadastrar
 );
 
@@ -128,6 +138,8 @@ router.post(
  */
 router.put(
   "/:id",
+  autenticacao,
+  autorizarPerfis("ADMIN"),
   ClinicasController.atualizar
 );
 
@@ -157,6 +169,8 @@ router.put(
  */
 router.delete(
   "/:id",
+  autenticacao,
+  autorizarPerfis("ADMIN"),
   ClinicasController.excluir
 );
 

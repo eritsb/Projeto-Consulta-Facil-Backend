@@ -58,7 +58,25 @@ class PacientesController {
     try {
       const paciente =
         await PacientesService.buscarPorId(
-          req.params.id
+          req.params.id,
+          req.usuario
+        );
+
+      return res.status(200).json(paciente);
+    } catch (error) {
+      return PacientesController.tratarErro(
+        error,
+        res,
+        "Erro interno ao buscar paciente"
+      );
+    }
+  }
+
+  static async buscarMe(req, res) {
+    try {
+      const paciente =
+        await PacientesService.buscarPorId(
+          req.usuario.id
         );
 
       return res.status(200).json(paciente);
@@ -97,12 +115,42 @@ class PacientesController {
       const paciente =
         await PacientesService.atualizar(
           req.params.id,
-          req.body
+          req.body,
+          req.usuario
         );
 
       return res.status(200).json({
         mensagem:
           "Paciente atualizado com sucesso",
+        paciente
+      });
+    } catch (error) {
+      return PacientesController.tratarErro(
+        error,
+        res,
+        "Erro interno ao atualizar paciente"
+      );
+    }
+  }
+
+  static async atualizarMe(req, res) {
+    try {
+      const dados = {
+        ...req.body
+      };
+
+      delete dados.perfil;
+      delete dados.ativo;
+
+      const paciente =
+        await PacientesService.atualizar(
+          req.usuario.id,
+          dados
+        );
+
+      return res.status(200).json({
+        mensagem:
+          "Perfil atualizado com sucesso",
         paciente
       });
     } catch (error) {

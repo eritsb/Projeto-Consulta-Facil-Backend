@@ -6,6 +6,14 @@ const ProfissionaisController = require(
   "../controllers/profissionaisController"
 );
 
+const autenticacao = require(
+  "../middlewares/autenticacao"
+);
+
+const autorizarPerfis = require(
+  "../middlewares/autorizarPerfis"
+);
+
 /**
  * @swagger
  * /profissionais:
@@ -135,6 +143,8 @@ router.get(
  */
 router.post(
   "/",
+  autenticacao,
+  autorizarPerfis("ADMIN"),
   ProfissionaisController.cadastrar
 );
 
@@ -202,6 +212,8 @@ router.post(
  */
 router.put(
   "/:id",
+  autenticacao,
+  autorizarPerfis("ADMIN"),
   ProfissionaisController.atualizar
 );
 
@@ -231,6 +243,8 @@ router.put(
  */
 router.delete(
   "/:id",
+  autenticacao,
+  autorizarPerfis("ADMIN"),
   ProfissionaisController.excluir
 );
 

@@ -23,11 +23,14 @@ O escopo implementado no código inclui:
 - filtros de busca por nome em pacientes, clínicas, especialidades e profissionais;
 - filtros de profissionais por clínica e por especialidade;
 - consulta de disponibilidades por profissional;
+- registro e histórico de triagens por paciente;
+- registro de triagem com análise assistida por IA (Groq) para sugerir uma especialidade cadastrada;
+- notificações in-app para pacientes (agendamentos e triagens);
 - documentação Swagger/OpenAPI servida pela própria API;
 - script de carga inicial (`seed.js`) executado diretamente no banco;
 - persistência em PostgreSQL hospedado no Neon.
 
-Fora do escopo atual: refresh token, recuperação de senha, logout server-side, upload de arquivos, pré-triagem, notificações, recomendações com IA, testes automatizados, migrations, Docker e pipeline de CI/CD.
+Fora do escopo atual: refresh token, recuperação de senha, logout server-side, upload de arquivos, testes automatizados, migrations, Docker e pipeline de CI/CD.
 
 | Item | Situação |
 |---|---|
@@ -136,6 +139,8 @@ Projeto-Consulta-Facil-Backend/
 ├── package.json
 ├── package-lock.json
 ├── seed.js
+├── sql/
+│   └── notificacoes.sql
 └── src/
     ├── config/
     │   └── database.js
@@ -146,8 +151,13 @@ Projeto-Consulta-Facil-Backend/
     │   ├── clinicasController.js
     │   ├── disponibilidadesController.js
     │   ├── especialidadesController.js
+    │   ├── notificacoesController.js
     │   ├── pacientesController.js
-    │   └── profissionaisController.js
+    │   ├── profissionaisController.js
+    │   ├── transcricaoController.js
+    │   └── triagensController.js
+    ├── jobs/
+    │   └── lembretesJob.js
     ├── middlewares/
     │   ├── autenticacao.js
     │   └── autorizarPerfis.js
@@ -157,8 +167,11 @@ Projeto-Consulta-Facil-Backend/
     │   ├── Clinicas.js
     │   ├── Disponibilidades.js
     │   ├── Especialidades.js
+    │   ├── Notificacoes.js
     │   ├── Pacientes.js
-    │   └── Profissionais.js
+    │   ├── Profissionais.js
+    │   ├── Recomendacoes.js
+    │   └── Triagens.js
     ├── routes/
     │   ├── administradoresRoutes.js
     │   ├── agendamentosRoutes.js
@@ -166,8 +179,11 @@ Projeto-Consulta-Facil-Backend/
     │   ├── clinicasRoutes.js
     │   ├── disponibilidadesRoutes.js
     │   ├── especialidadesRoutes.js
+    │   ├── notificacoesRoutes.js
     │   ├── pacientesRoutes.js
-    │   └── profissionaisRoutes.js
+    │   ├── profissionaisRoutes.js
+    │   ├── transcricaoRoutes.js
+    │   └── triagensRoutes.js
     ├── services/
     │   ├── administradoresService.js
     │   ├── agendamentosService.js
@@ -175,8 +191,12 @@ Projeto-Consulta-Facil-Backend/
     │   ├── clinicasService.js
     │   ├── disponibilidadesService.js
     │   ├── especialidadesService.js
+    │   ├── iaService.js
+    │   ├── notificacoesService.js
     │   ├── pacientesService.js
-    │   └── profissionaisService.js
+    │   ├── profissionaisService.js
+    │   ├── transcricaoService.js
+    │   └── triagensService.js
     ├── server.js
     └── swagger.js
 ```
@@ -202,12 +222,22 @@ Crie um arquivo `.env` na raiz, tomando `.env.example` como base:
 | `PORT` | Não | `3000` | Porta HTTP do Express |
 | `JWT_SECRET` | Sim | — | Chave usada para assinar e verificar os tokens |
 | `JWT_EXPIRES_IN` | Não | `8h` | Validade do token aceita pelo `jsonwebtoken` |
+| `GROQ_API_KEY` | Sim para IA | — | Chave da Groq usada na triagem com IA e no chatbot |
+| `GROQ_MODEL` | Não | `llama-3.3-70b-versatile` | Modelo de chat usado pela IA |
+| `GROQ_WHISPER_MODEL` | Não | `whisper-large-v3-turbo` | Modelo de transcrição de áudio |
+| `LEMBRETE_INTERVALO_MINUTOS` | Não | `60` | Intervalo entre execuções do job de lembretes |
+| `LEMBRETE_ANTECEDENCIA_HORAS` | Não | `24` | Antecedência com que o lembrete de consulta é gerado |
 
 ```env
 DATABASE_URL=postgresql://USUARIO:SENHA@HOST/BANCO?sslmode=require
 PORT=3000
 JWT_SECRET=CHAVE_SECRETA_FORTE
 JWT_EXPIRES_IN=8h
+GROQ_API_KEY=sua_chave_aqui
+GROQ_MODEL=llama-3.3-70b-versatile
+GROQ_WHISPER_MODEL=whisper-large-v3-turbo
+LEMBRETE_INTERVALO_MINUTOS=60
+LEMBRETE_ANTECEDENCIA_HORAS=24
 ```
 
 Se `DATABASE_URL` não estiver definida, `src/config/database.js` lança erro na inicialização. Se `JWT_SECRET` não estiver definida, o login e a validação de token falham com `500`.
@@ -256,7 +286,7 @@ Em produção, a mesma interface está disponível em:
 https://back-end-pi-ihs1.onrender.com/api-docs/
 ```
 
-A especificação é gerada por `swagger-jsdoc` a partir dos comentários das rotas. Ela declara dois servidores (local e Render) e o esquema de segurança `bearerAuth` (JWT). Nem todas as rotas públicas possuem anotação de segurança, o que reflete o comportamento real da API: apenas `/administradores` e `GET /auth/perfil` exigem token.
+A especificação é gerada por `swagger-jsdoc` a partir dos comentários das rotas. Ela declara dois servidores (local e Render) e o esquema de segurança `bearerAuth` (JWT). As rotas protegidas declaram `security: bearerAuth`; as rotas públicas de leitura permanecem sem anotação.
 
 ### 4.5 Carga inicial de dados (`seed.js`)
 
@@ -418,11 +448,51 @@ O administrador é uma entidade isolada: não possui vínculo com clínicas, pro
 | `observacao` | text | Nulo permitido |
 | `data_criacao` | timestamp | Padrão `now()` (inferido) |
 
+#### `triagens`
+
+| Coluna | Tipo inferido | Restrição/observação |
+|---|---|---|
+| `id_triagem` | serial/integer | PK |
+| `id_paciente` | integer | FK → `pacientes` |
+| `sintomas` | text | Obrigatório na aplicação |
+| `localizacao` | varchar/text | Obrigatório na aplicação |
+| `duracao_sintomas` | varchar/text | Obrigatório na aplicação |
+| `intensidade` | integer/varchar | Inteiro de `1` a `5`; gravado como texto pela aplicação |
+| `observacoes` | text | Nulo permitido |
+| `data_triagem` | timestamp | Padrão `now()` (inferido) |
+| `id_agendamento` | integer | FK → `agendamentos`; `ON DELETE SET NULL`; nulo até o vínculo |
+
+#### `notificacoes`
+
+| Coluna | Tipo inferido | Restrição/observação |
+|---|---|---|
+| `id_notificacao` | serial/integer | PK |
+| `id_paciente` | integer | FK → `pacientes`; `ON DELETE CASCADE` |
+| `id_agendamento` | integer | FK → `agendamentos`; `ON DELETE CASCADE`; nulo permitido |
+| `tipo` | varchar(40) | `AGENDAMENTO_CRIADO`, `AGENDAMENTO_ATUALIZADO`, `AGENDAMENTO_CONFIRMADO`, `AGENDAMENTO_REAGENDADO`, `AGENDAMENTO_CANCELADO`, `AGENDAMENTO_EXCLUIDO`, `PRE_TRIAGEM_IA` ou `LEMBRETE_CONSULTA` |
+| `titulo` | varchar(150) | Obrigatório |
+| `mensagem` | text | Obrigatória |
+| `lida` | boolean | Padrão `false` |
+| `data_criacao` | timestamp | Padrão `now()` |
+
+#### `recomendacoes`
+
+| Coluna | Tipo inferido | Restrição/observação |
+|---|---|---|
+| `id_recomendacao` | serial/integer | PK |
+| `id_triagem` | integer | FK → `triagens`; um registro por triagem |
+| `id_especialidade` | integer | FK → `especialidades`; especialidade ativa sugerida pela IA |
+| `confianca` | integer | Confiança da IA entre `0` e `100` |
+| `justificativa` | text | Justificativa curta da IA; nulo permitido |
+
 ### 5.4 Observações sobre o modelo
 
 - Não existe tabela de associação entre clínicas e especialidades; o profissional é o elo entre as duas.
 - O campo `perfil` é gravado nas tabelas `pacientes`, `profissionais` e `administradores` e é usado no login e na autorização.
 - O schema precisa ser criado manualmente no Neon; o seed apenas popula tabelas existentes.
+- A tabela `notificacoes` é criada pelo script `sql/notificacoes.sql`.
+- O resultado da IA de cada triagem é gravado na tabela `recomendacoes`; ao excluir uma triagem, a recomendação correspondente é apagada antes pela aplicação (a FK não tem `ON DELETE CASCADE`).
+- O vínculo da triagem com o agendamento fica na própria triagem (`triagens.id_agendamento`) e é definido em `POST /agendamentos` com `id_triagem`; ao excluir o agendamento, o vínculo é desfeito (`ON DELETE SET NULL`).
 
 ---
 
@@ -531,11 +601,13 @@ Retorna os dados públicos do usuário autenticado, sem `senha_hash`, acrescidos
 
 | Método | Rota | Descrição | Autenticação |
 |---|---|---|---|
-| GET | `/pacientes` | Lista pacientes; aceita `?nome=` | Não |
-| GET | `/pacientes/:id` | Busca por ID | Não |
+| GET | `/pacientes` | Lista pacientes; aceita `?nome=` | Sim (`ADMIN`) |
+| GET | `/pacientes/me` | Retorna o perfil do paciente autenticado | Sim (`PACIENTE`) |
+| PUT | `/pacientes/me` | Atualiza o perfil do paciente autenticado | Sim (`PACIENTE`) |
+| GET | `/pacientes/:id` | Busca por ID | Sim (`PACIENTE` dono ou `ADMIN`) |
 | POST | `/pacientes` | Cadastra paciente | Não |
-| PUT | `/pacientes/:id` | Atualiza paciente | Não |
-| DELETE | `/pacientes/:id` | Exclui paciente | Não |
+| PUT | `/pacientes/:id` | Atualiza paciente | Sim (`PACIENTE` dono ou `ADMIN`) |
+| DELETE | `/pacientes/:id` | Exclui paciente | Sim (`ADMIN`) |
 
 **Filtro:** `GET /pacientes?nome=ana` usa `ILIKE %ana%` e ordena por nome.
 
@@ -592,9 +664,9 @@ Retorna os dados públicos do usuário autenticado, sem `senha_hash`, acrescidos
 |---|---|---|---|
 | GET | `/especialidades` | Lista especialidades; aceita `?nome=` | Não |
 | GET | `/especialidades/:id` | Busca por ID | Não |
-| POST | `/especialidades` | Cadastra especialidade | Não |
-| PUT | `/especialidades/:id` | Atualiza especialidade | Não |
-| DELETE | `/especialidades/:id` | Exclui especialidade | Não |
+| POST | `/especialidades` | Cadastra especialidade | Sim (`ADMIN`) |
+| PUT | `/especialidades/:id` | Atualiza especialidade | Sim (`ADMIN`) |
+| DELETE | `/especialidades/:id` | Exclui especialidade | Sim (`ADMIN`) |
 
 **Filtro:** `GET /especialidades?nome=cardio` usa `ILIKE %cardio%`. O filtro existe no controller, mas não está documentado no Swagger.
 
@@ -630,9 +702,9 @@ Retorna os dados públicos do usuário autenticado, sem `senha_hash`, acrescidos
 |---|---|---|---|
 | GET | `/clinicas` | Lista clínicas; aceita `?nome=` | Não |
 | GET | `/clinicas/:id` | Busca por ID | Não |
-| POST | `/clinicas` | Cadastra clínica | Não |
-| PUT | `/clinicas/:id` | Atualiza clínica | Não |
-| DELETE | `/clinicas/:id` | Exclui clínica | Não |
+| POST | `/clinicas` | Cadastra clínica | Sim (`ADMIN`) |
+| PUT | `/clinicas/:id` | Atualiza clínica | Sim (`ADMIN`) |
+| DELETE | `/clinicas/:id` | Exclui clínica | Sim (`ADMIN`) |
 
 **Filtro:** `GET /clinicas?nome=vida` usa `ILIKE %vida%`. O filtro existe no controller, mas não está documentado no Swagger.
 
@@ -676,9 +748,9 @@ Retorna os dados públicos do usuário autenticado, sem `senha_hash`, acrescidos
 |---|---|---|---|
 | GET | `/profissionais` | Lista e filtra profissionais | Não |
 | GET | `/profissionais/:id` | Busca por ID | Não |
-| POST | `/profissionais` | Cadastra profissional | Não |
-| PUT | `/profissionais/:id` | Atualiza profissional | Não |
-| DELETE | `/profissionais/:id` | Exclui profissional | Não |
+| POST | `/profissionais` | Cadastra profissional | Sim (`ADMIN`) |
+| PUT | `/profissionais/:id` | Atualiza profissional | Sim (`ADMIN`) |
+| DELETE | `/profissionais/:id` | Exclui profissional | Sim (`ADMIN`) |
 
 **Filtros (query string):**
 
@@ -726,9 +798,9 @@ A precedência é `nome` > `clinica` > `especialidade`. Sem filtro, lista todos.
 | GET | `/disponibilidades` | Lista todas, com nome do profissional | Não |
 | GET | `/disponibilidades/profissional/:id` | Lista horários de um profissional | Não |
 | GET | `/disponibilidades/:id` | Busca por ID | Não |
-| POST | `/disponibilidades` | Cadastra horário | Não |
-| PUT | `/disponibilidades/:id` | Atualiza horário | Não |
-| DELETE | `/disponibilidades/:id` | Exclui horário | Não |
+| POST | `/disponibilidades` | Cadastra horário | Sim (`ADMIN`) |
+| PUT | `/disponibilidades/:id` | Atualiza horário | Sim (`ADMIN`) |
+| DELETE | `/disponibilidades/:id` | Exclui horário | Sim (`ADMIN`) |
 
 **Corpo de criação:**
 
@@ -755,13 +827,15 @@ A precedência é `nome` > `clinica` > `especialidade`. Sem filtro, lista todos.
 
 | Método | Rota | Descrição | Autenticação |
 |---|---|---|---|
-| GET | `/agendamentos` | Lista todos com dados relacionados | Não |
-| GET | `/agendamentos/:id` | Busca por ID | Não |
-| GET | `/agendamentos/paciente/:idPaciente` | Lista por paciente | Não |
-| POST | `/agendamentos` | Cria agendamento | Não |
-| PUT | `/agendamentos/:id` | Atualiza observação/status | Não |
-| PATCH | `/agendamentos/:id/cancelar` | Cancela agendamento | Não |
-| DELETE | `/agendamentos/:id` | Exclui agendamento | Não |
+| GET | `/agendamentos` | Lista todos com dados relacionados | Sim (`ADMIN`) |
+| GET | `/agendamentos/me` | Lista os agendamentos do paciente autenticado | Sim (`PACIENTE`) |
+| GET | `/agendamentos/:id` | Busca por ID | Sim (`PACIENTE` dono ou `ADMIN`) |
+| GET | `/agendamentos/paciente/:idPaciente` | Lista por paciente | Sim (`PACIENTE` dono ou `ADMIN`) |
+| POST | `/agendamentos` | Cria agendamento; aceita `id_triagem` | Sim (`PACIENTE` ou `ADMIN`) |
+| PUT | `/agendamentos/:id` | Atualiza observação/status | Sim (`PACIENTE` dono ou `ADMIN`) |
+| PATCH | `/agendamentos/:id/cancelar` | Cancela agendamento | Sim (`PACIENTE` dono ou `ADMIN`) |
+| PATCH | `/agendamentos/:id/reagendar` | Reagenda para nova data/horário | Sim (`PACIENTE` dono) |
+| DELETE | `/agendamentos/:id` | Exclui agendamento | Sim (`PACIENTE` dono ou `ADMIN`) |
 
 **Corpo de criação:**
 
@@ -770,7 +844,8 @@ A precedência é `nome` > `clinica` > `especialidade`. Sem filtro, lista todos.
   "id_paciente": 1,
   "id_profissional": 1,
   "id_disponibilidade": 1,
-  "observacao": "Primeira consulta"
+  "observacao": "Primeira consulta",
+  "id_triagem": 1
 }
 ```
 
@@ -784,6 +859,7 @@ A precedência é `nome` > `clinica` > `especialidade`. Sem filtro, lista todos.
 6. Disponibilidade deve estar com status `DISPONIVEL` (`409`).
 7. Paciente não pode ter outro agendamento na mesma data e hora, exceto cancelado (`409`).
 8. A reserva e o `INSERT` são executados em um único CTE atômico. Se o horário for reservado por outra requisição no intervalo, a operação retorna `409`.
+9. `id_triagem` é opcional. Quando presente, a triagem deve existir (`404`), pertencer ao mesmo paciente (`403`) e não estar vinculada a outro agendamento (`409`); o vínculo é gravado após a criação do agendamento.
 
 **Regras de atualização:**
 
@@ -791,7 +867,19 @@ A precedência é `nome` > `clinica` > `especialidade`. Sem filtro, lista todos.
 - Status aceitos: `AGENDADO`, `CONFIRMADO`, `CANCELADO`, `REALIZADO`.
 - Alterar para `CANCELADO` delega para a operação de cancelamento.
 - Agendamento já cancelado não pode ser alterado.
-- Não há operação de reagendamento (mudar data, hora ou profissional).
+- Mudar o status para `CONFIRMADO` envia a notificação `AGENDAMENTO_CONFIRMADO`; as demais alterações enviam `AGENDAMENTO_ATUALIZADO`.
+
+**Reagendamento (`PATCH /:id/reagendar`):**
+
+- Apenas o paciente dono pode reagendar; administradores não têm acesso à operação;
+- agendamento `CANCELADO` ou `REALIZADO` não pode ser reagendado (`409`);
+- a nova disponibilidade deve existir (`404`), com profissional ativo (`409`) e sem conflito de horário para o paciente (`409`);
+- a nova disponibilidade é reservada com `UPDATE ... WHERE status = 'DISPONIVEL' RETURNING *`; se não retornar linha, responde `409` sem alterar mais nada;
+- o agendamento é atualizado com a nova data, horário e profissional; a disponibilidade antiga é liberada para `DISPONIVEL` somente depois;
+- a operação roda em um único statement SQL com CTEs (reserva → atualiza → libera), garantindo atomicidade via Postgres; se a nova disponibilidade não estiver `DISPONIVEL`, nenhum passo é aplicado;
+- reagendar para o mesmo horário atual responde `409` antes de tocar o banco;
+- envia a notificação `AGENDAMENTO_REAGENDADO` com o horário antigo e o novo;
+- a situação atual (`AGENDADO`/`CONFIRMADO`) é mantida.
 
 **Cancelamento:**
 
@@ -868,6 +956,85 @@ Todas as rotas exigem `Authorization: Bearer <token>` de um usuário com perfil 
 
 ---
 
+### 6.11 Triagens
+
+Todas as rotas exigem `Authorization: Bearer <token>`. O paciente acessa apenas as próprias triagens; a listagem completa é exclusiva do perfil `ADMIN`.
+
+| Método | Rota | Descrição | Autenticação |
+|---|---|---|---|
+| POST | `/triagens/chat` | Chatbot de orientação com IA | Sim (`PACIENTE`) |
+| POST | `/triagens` | Cadastra triagem com análise de IA e grava a recomendação | Sim (`PACIENTE`) |
+| GET | `/triagens/me` | Lista as triagens do paciente autenticado | Sim (`PACIENTE`) |
+| GET | `/triagens` | Lista todas as triagens | Sim (`ADMIN`) |
+| GET | `/triagens/:id` | Busca triagem por ID | Sim (`PACIENTE` dono ou `ADMIN`) |
+| PUT | `/triagens/:id` | Atualiza uma triagem | Sim (`PACIENTE` dono) |
+| DELETE | `/triagens/:id` | Exclui uma triagem | Sim (`PACIENTE` dono) |
+
+**Corpo de cadastro:**
+
+```json
+{
+  "sintomas": ["dor de cabeça", "febre"],
+  "localizacao": "cabeça",
+  "duracao_sintomas": "3 dias",
+  "intensidade": 4,
+  "faixa_etaria": "30-39 anos",
+  "observacoes": "Piora à noite"
+}
+```
+
+**Regras:**
+
+- o `id_paciente` é obtido do token e não é aceito no corpo;
+- `sintomas` aceita array ou string; arrays são convertidos em texto separado por vírgulas;
+- `localizacao` e `duracao_sintomas` são obrigatórios;
+- `intensidade` deve ser um inteiro de `1` a `5`;
+- `PUT` é parcial: campos ausentes mantêm o valor atual, mas o conjunto final é validado por completo;
+- o paciente só altera ou exclui a própria triagem (`403` caso contrário);
+- ao excluir uma triagem, a recomendação correspondente é apagada antes (a FK `recomendacoes.id_triagem` não tem `ON DELETE CASCADE`);
+- `GET /triagens/:id` deixa o paciente ver apenas a própria triagem e o `ADMIN` ver qualquer uma;
+- `POST /triagens` também exige `faixa_etaria` — usado apenas na chamada da IA, não é salvo —, considera somente especialidades ativas e é o único fluxo de criação: chama a IA antes de qualquer gravação, salva a triagem em `triagens` e a sugestão em `recomendacoes`; se a IA falhar, nada é salvo; se a gravação da recomendação falhar, a triagem criada é descartada; a resposta inclui `id_triagem`, `id_recomendacao`, `especialidade`, `confianca` (0 a 100) e `justificativa`, e esse `id_triagem` pode ser enviado em `POST /agendamentos`;
+- `POST /triagens/chat` recebe `{ mensagem, historico? }` e retorna `{ resposta, especialidade, confianca, justificativa }`; `especialidade` pode ser `null` quando nenhuma especialidade cadastrada é adequada;
+- a IA não emite diagnóstico nem recomenda medicamentos ou tratamentos.
+
+---
+
+### 6.12 Notificações
+
+Todas as rotas exigem `Authorization: Bearer <token>` de um paciente e retornam apenas as notificações do próprio usuário.
+
+| Método | Rota | Descrição | Autenticação |
+|---|---|---|---|
+| GET | `/notificacoes` | Lista as notificações do paciente autenticado | Sim (`PACIENTE`) |
+| PATCH | `/notificacoes/lidas` | Marca todas as notificações como lidas | Sim (`PACIENTE`) |
+| PATCH | `/notificacoes/:id/lida` | Marca uma notificação como lida | Sim (`PACIENTE` dono) |
+| DELETE | `/notificacoes/:id` | Exclui uma notificação | Sim (`PACIENTE` dono) |
+
+**Notificações geradas automaticamente:**
+
+| Evento | Tipo | Destinatário |
+|---|---|---|
+| Agendamento criado | `AGENDAMENTO_CRIADO` | Paciente do agendamento |
+| Agendamento atualizado | `AGENDAMENTO_ATUALIZADO` | Paciente do agendamento |
+| Agendamento confirmado | `AGENDAMENTO_CONFIRMADO` | Paciente do agendamento |
+| Agendamento reagendado | `AGENDAMENTO_REAGENDADO` | Paciente do agendamento |
+| Agendamento cancelado | `AGENDAMENTO_CANCELADO` | Paciente do agendamento |
+| Agendamento excluído | `AGENDAMENTO_EXCLUIDO` | Paciente do agendamento |
+| Triagem com IA concluída | `PRE_TRIAGEM_IA` | Paciente da triagem |
+| Consulta próxima (job periódico) | `LEMBRETE_CONSULTA` | Paciente do agendamento |
+
+**Regras:**
+
+- cada notificação pertence a um único paciente;
+- o paciente só lê, marca como lida ou exclui as próprias notificações (`403` caso contrário);
+- a listagem vem da mais recente para a mais antiga;
+- falhas ao gravar uma notificação não interrompem o agendamento nem a triagem; o erro é apenas registrado no log;
+- a tabela é criada pelo script `sql/notificacoes.sql`;
+- o lembrete de consulta é gerado por um job em processo (`src/jobs/lembretesJob.js`) a cada `LEMBRETE_INTERVALO_MINUTOS` minutos, para consultas `AGENDADO` ou `CONFIRMADO` que ocorrerão nas próximas `LEMBRETE_ANTECEDENCIA_HORAS` horas;
+- o job não duplica lembretes: antes de criar, verifica se já existe um `LEMBRETE_CONSULTA` para o mesmo agendamento.
+
+---
+
 ## 7. Regras de negócio consolidadas
 
 - CPF de paciente e de profissional é armazenado sem pontuação e validado apenas por comprimento (11 dígitos).
@@ -886,10 +1053,15 @@ Todas as rotas exigem `Authorization: Bearer <token>` de um usuário com perfil 
 - O status do agendamento segue o ciclo: `AGENDADO` → `CONFIRMADO`/`REALIZADO`/`CANCELADO`; `CANCELADO` é terminal para novas alterações.
 - Não há validação de data futura nem de sobreposição de horários na criação de disponibilidades.
 - Não há paginação em nenhuma listagem.
-- Não há operação de reagendamento.
+- O paciente dono pode reagendar o próprio agendamento em `PATCH /agendamentos/:id/reagendar`; a nova disponibilidade é reservada antes da atualização, que por sua vez precede a liberação da antiga.
 - O cadastro de paciente força `ativo: true`; a atualização pode desativá-lo.
 - O cadastro de profissional permite enviar `ativo: false`.
 - O cadastro de administrador força `ativo: true`.
+- Notificações in-app são geradas para o paciente nos eventos de agendamento (criação, atualização, confirmação, reagendamento, cancelamento e exclusão), de triagem (cadastro com análise de IA) e de proximidade da consulta (lembrete).
+- Uma falha ao gravar a notificação não desfaz a operação principal; o erro é apenas registrado no log.
+- A sugestão de especialidade da IA é persistida em `recomendacoes`; o vínculo com um agendamento do mesmo paciente é feito em `POST /agendamentos` com `id_triagem`.
+- Ao criar um agendamento como `PACIENTE`, o `id_paciente` vem do token; o `ADMIN` pode informar o paciente no corpo.
+- Rotas de leitura pública permanecem abertas; escritas administrativas exigem `ADMIN` e operações do paciente exigem `PACIENTE` com verificação de dono.
 
 ---
 
@@ -927,14 +1099,18 @@ O campo `id` é genérico: representa `id_paciente`, `id_profissional` ou `id_ad
 | `/auth/login` | Pública |
 | `GET /auth/perfil` | JWT + `PACIENTE`, `PROFISSIONAL` ou `ADMIN` |
 | `/administradores` | JWT + `ADMIN` |
-| `/pacientes` | Pública |
-| `/especialidades` | Pública |
-| `/clinicas` | Pública |
-| `/profissionais` | Pública |
-| `/disponibilidades` | Pública |
-| `/agendamentos` | Pública |
+| `/pacientes` (escrita administrativa e listagem) | JWT + `ADMIN`; `DELETE` apenas `ADMIN` |
+| `/pacientes/me` | JWT + `PACIENTE` |
+| `/pacientes/:id` | JWT + `PACIENTE` dono ou `ADMIN` (exceto `POST /pacientes`, público) |
+| `/especialidades`, `/clinicas`, `/profissionais`, `/disponibilidades` | Leitura pública; `POST`/`PUT`/`DELETE` com JWT + `ADMIN` |
+| `/agendamentos` | JWT + `PACIENTE` ou `ADMIN`; paciente só acessa os próprios agendamentos |
+| `/agendamentos/:id/reagendar` | JWT + `PACIENTE` dono do agendamento |
+| `/triagens` (paciente) | JWT + `PACIENTE`, com verificação de dono em `GET /:id`, `PUT` e `DELETE` |
+| `GET /triagens` | JWT + `ADMIN` |
+| `/triagens/chat` | JWT + `PACIENTE` |
+| `/notificacoes` | JWT + `PACIENTE`, com verificação de dono em `PATCH /:id/lida` e `DELETE /:id` |
 
-**Todos os endpoints de negócio de pacientes, especialidades, clínicas, profissionais, disponibilidades e agendamentos estão públicos.** Apenas o módulo de administradores e o perfil autenticado exigem token.
+**Resumo:** a leitura de catálogo (pacientes com filtro, especialidades, clínicas, profissionais e disponibilidades) e o cadastro público de paciente permanecem abertos. Exigem token todos os fluxos do paciente autenticado, as escritas administrativas, agendamentos, triagens, notificações e o módulo de administradores.
 
 ### 8.4 Segurança implementada e limitações
 
@@ -989,6 +1165,8 @@ Rota inexistente retorna `404` com `{"erro":"Rota não encontrada"}`.
 | Profissionais | `GET /:id` devolve `404` para qualquer erro; `POST`, `PUT` e `DELETE` devolvem `400` para qualquer erro; `GET /` devolve `500` |
 | Disponibilidades | `GET /` e `GET /profissional/:id` devolvem `500`; `GET /:id` e `DELETE` devolvem `404`; `POST` e `PUT` devolvem `400` |
 | Administradores | `GET /` devolve `500`; `GET /:id` devolve `404`; `POST`, `PUT` e `DELETE` devolvem `400` |
+| Triagens | Usa o helper padronizado, respeita `statusCode` e devolve `403` ao acessar triagem de outro paciente |
+| Notificações | Usa o helper padronizado, respeita `statusCode` e devolve `403` ao acessar notificação de outro paciente |
 
 ### 9.3 Inconsistências conhecidas
 
@@ -1072,11 +1250,14 @@ The implemented scope includes:
 - name search filters for patients, clinics, specialties, and professionals;
 - professional filters by clinic and specialty;
 - availability lookup by professional;
+- triage records and history per patient;
+- triage registration with AI-assisted analysis (Groq) to suggest a registered specialty;
+- in-app notifications for patients (appointments and triage);
 - Swagger/OpenAPI documentation served by the API itself;
 - a seed script (`seed.js`) that writes directly to the database;
 - persistence in PostgreSQL hosted on Neon.
 
-Out of the current scope: refresh tokens, password recovery, server-side logout, file uploads, pre-triage, notifications, AI recommendations, automated tests, migrations, Docker, and CI/CD.
+Out of the current scope: refresh tokens, password recovery, server-side logout, file uploads, automated tests, migrations, Docker, and CI/CD.
 
 | Item | Status |
 |---|---|
@@ -1185,6 +1366,8 @@ Projeto-Consulta-Facil-Backend/
 ├── package.json
 ├── package-lock.json
 ├── seed.js
+├── sql/
+│   └── notificacoes.sql
 └── src/
     ├── config/
     │   └── database.js
@@ -1195,8 +1378,13 @@ Projeto-Consulta-Facil-Backend/
     │   ├── clinicasController.js
     │   ├── disponibilidadesController.js
     │   ├── especialidadesController.js
+    │   ├── notificacoesController.js
     │   ├── pacientesController.js
-    │   └── profissionaisController.js
+    │   ├── profissionaisController.js
+    │   ├── transcricaoController.js
+    │   └── triagensController.js
+    ├── jobs/
+    │   └── lembretesJob.js
     ├── middlewares/
     │   ├── autenticacao.js
     │   └── autorizarPerfis.js
@@ -1206,8 +1394,11 @@ Projeto-Consulta-Facil-Backend/
     │   ├── Clinicas.js
     │   ├── Disponibilidades.js
     │   ├── Especialidades.js
+    │   ├── Notificacoes.js
     │   ├── Pacientes.js
-    │   └── Profissionais.js
+    │   ├── Profissionais.js
+    │   ├── Recomendacoes.js
+    │   └── Triagens.js
     ├── routes/
     │   ├── administradoresRoutes.js
     │   ├── agendamentosRoutes.js
@@ -1215,8 +1406,11 @@ Projeto-Consulta-Facil-Backend/
     │   ├── clinicasRoutes.js
     │   ├── disponibilidadesRoutes.js
     │   ├── especialidadesRoutes.js
+    │   ├── notificacoesRoutes.js
     │   ├── pacientesRoutes.js
-    │   └── profissionaisRoutes.js
+    │   ├── profissionaisRoutes.js
+    │   ├── transcricaoRoutes.js
+    │   └── triagensRoutes.js
     ├── services/
     │   ├── administradoresService.js
     │   ├── agendamentosService.js
@@ -1224,8 +1418,12 @@ Projeto-Consulta-Facil-Backend/
     │   ├── clinicasService.js
     │   ├── disponibilidadesService.js
     │   ├── especialidadesService.js
+    │   ├── iaService.js
+    │   ├── notificacoesService.js
     │   ├── pacientesService.js
-    │   └── profissionaisService.js
+    │   ├── profissionaisService.js
+    │   ├── transcricaoService.js
+    │   └── triagensService.js
     ├── server.js
     └── swagger.js
 ```
@@ -1251,12 +1449,22 @@ Create a `.env` file at the repository root based on `.env.example`:
 | `PORT` | No | `3000` | Express HTTP port |
 | `JWT_SECRET` | Yes | — | Key used to sign and verify tokens |
 | `JWT_EXPIRES_IN` | No | `8h` | Token lifetime accepted by `jsonwebtoken` |
+| `GROQ_API_KEY` | Yes for AI | — | Groq key used by the AI triage analysis and the chatbot |
+| `GROQ_MODEL` | No | `llama-3.3-70b-versatile` | Chat model used by the AI |
+| `GROQ_WHISPER_MODEL` | No | `whisper-large-v3-turbo` | Audio transcription model |
+| `LEMBRETE_INTERVALO_MINUTOS` | No | `60` | Interval between reminder job runs |
+| `LEMBRETE_ANTECEDENCIA_HORAS` | No | `24` | How far in advance the appointment reminder is generated |
 
 ```env
 DATABASE_URL=postgresql://USER:PASSWORD@HOST/DATABASE?sslmode=require
 PORT=3000
 JWT_SECRET=STRONG_SECRET_KEY
 JWT_EXPIRES_IN=8h
+GROQ_API_KEY=your_key_here
+GROQ_MODEL=llama-3.3-70b-versatile
+GROQ_WHISPER_MODEL=whisper-large-v3-turbo
+LEMBRETE_INTERVALO_MINUTOS=60
+LEMBRETE_ANTECEDENCIA_HORAS=24
 ```
 
 If `DATABASE_URL` is missing, `src/config/database.js` throws during startup. If `JWT_SECRET` is missing, login and token validation fail with `500`.
@@ -1305,7 +1513,7 @@ In production:
 https://back-end-pi-ihs1.onrender.com/api-docs/
 ```
 
-The specification is generated by `swagger-jsdoc` from route comments. It declares two servers (local and Render) and the `bearerAuth` security scheme (JWT). Not every public route has a security annotation, which reflects the actual behavior: only `/administradores` and `GET /auth/perfil` require a token.
+The specification is generated by `swagger-jsdoc` from route comments. It declares two servers (local and Render) and the `bearerAuth` security scheme (JWT). Protected routes declare `security: bearerAuth`; public read routes remain unannotated.
 
 ### 4.5 Seed data (`seed.js`)
 
@@ -1467,11 +1675,51 @@ Administrators are an isolated entity: they are not linked to clinics, professio
 | `observacao` | text | Nullable |
 | `data_criacao` | timestamp | Defaults to `now()` (inferred) |
 
+#### `triagens`
+
+| Column | Inferred type | Constraint/notes |
+|---|---|---|
+| `id_triagem` | serial/integer | PK |
+| `id_paciente` | integer | FK → `pacientes` |
+| `sintomas` | text | Required by the application |
+| `localizacao` | varchar/text | Required by the application |
+| `duracao_sintomas` | varchar/text | Required by the application |
+| `intensidade` | integer/varchar | Integer from `1` to `5`; stored as text by the application |
+| `observacoes` | text | Nullable |
+| `data_triagem` | timestamp | Defaults to `now()` (inferred) |
+| `id_agendamento` | integer | FK → `agendamentos`; `ON DELETE SET NULL`; null until linked |
+
+#### `notificacoes`
+
+| Column | Inferred type | Constraint/notes |
+|---|---|---|
+| `id_notificacao` | serial/integer | PK |
+| `id_paciente` | integer | FK → `pacientes`; `ON DELETE CASCADE` |
+| `id_agendamento` | integer | FK → `agendamentos`; `ON DELETE CASCADE`; nullable |
+| `tipo` | varchar(40) | `AGENDAMENTO_CRIADO`, `AGENDAMENTO_ATUALIZADO`, `AGENDAMENTO_CONFIRMADO`, `AGENDAMENTO_REAGENDADO`, `AGENDAMENTO_CANCELADO`, `AGENDAMENTO_EXCLUIDO`, `PRE_TRIAGEM_IA`, or `LEMBRETE_CONSULTA` |
+| `titulo` | varchar(150) | Required |
+| `mensagem` | text | Required |
+| `lida` | boolean | Defaults to `false` |
+| `data_criacao` | timestamp | Defaults to `now()` |
+
+#### `recomendacoes`
+
+| Column | Inferred type | Constraint/notes |
+|---|---|---|
+| `id_recomendacao` | serial/integer | PK |
+| `id_triagem` | integer | FK → `triagens`; one record per triage |
+| `id_especialidade` | integer | FK → `especialidades`; active specialty suggested by the AI |
+| `confianca` | integer | AI confidence between `0` and `100` |
+| `justificativa` | text | Short AI justification; nullable |
+
 ### 5.4 Model notes
 
 - There is no clinic–specialty association table; the professional links the two.
 - The `perfil` column exists in `pacientes`, `profissionais`, and `administradores` and is used for login and authorization.
 - The schema must be created manually in Neon; the seed only populates existing tables.
+- The `notificacoes` table is created by the `sql/notificacoes.sql` script.
+- The AI result of each triage is stored in the `recomendacoes` table; when a triage is deleted, the corresponding recommendation is deleted first by the application (the FK has no `ON DELETE CASCADE`).
+- The triage–appointment link lives on the triage itself (`triagens.id_agendamento`) and is set in `POST /agendamentos` with `id_triagem`; deleting the appointment clears the link (`ON DELETE SET NULL`).
 
 ---
 
@@ -1580,11 +1828,13 @@ Returns the authenticated user's public data, without `senha_hash`, plus `"perfi
 
 | Method | Route | Description | Authentication |
 |---|---|---|---|
-| GET | `/pacientes` | Lists patients; accepts `?nome=` | No |
-| GET | `/pacientes/:id` | Finds by ID | No |
+| GET | `/pacientes` | Lists patients; accepts `?nome=` | Yes (`ADMIN`) |
+| GET | `/pacientes/me` | Returns the authenticated patient's profile | Yes (`PACIENTE`) |
+| PUT | `/pacientes/me` | Updates the authenticated patient's profile | Yes (`PACIENTE`) |
+| GET | `/pacientes/:id` | Finds by ID | Yes (`PACIENTE` owner or `ADMIN`) |
 | POST | `/pacientes` | Creates a patient | No |
-| PUT | `/pacientes/:id` | Updates a patient | No |
-| DELETE | `/pacientes/:id` | Deletes a patient | No |
+| PUT | `/pacientes/:id` | Updates a patient | Yes (`PACIENTE` owner or `ADMIN`) |
+| DELETE | `/pacientes/:id` | Deletes a patient | Yes (`ADMIN`) |
 
 **Filter:** `GET /pacientes?nome=ana` uses `ILIKE %ana%` and orders by name.
 
@@ -1641,9 +1891,9 @@ Returns the authenticated user's public data, without `senha_hash`, plus `"perfi
 |---|---|---|---|
 | GET | `/especialidades` | Lists specialties; accepts `?nome=` | No |
 | GET | `/especialidades/:id` | Finds by ID | No |
-| POST | `/especialidades` | Creates a specialty | No |
-| PUT | `/especialidades/:id` | Updates a specialty | No |
-| DELETE | `/especialidades/:id` | Deletes a specialty | No |
+| POST | `/especialidades` | Creates a specialty | Yes (`ADMIN`) |
+| PUT | `/especialidades/:id` | Updates a specialty | Yes (`ADMIN`) |
+| DELETE | `/especialidades/:id` | Deletes a specialty | Yes (`ADMIN`) |
 
 **Filter:** `GET /especialidades?nome=cardio` uses `ILIKE %cardio%`. The filter exists in the controller but is not documented in Swagger.
 
@@ -1679,9 +1929,9 @@ Returns the authenticated user's public data, without `senha_hash`, plus `"perfi
 |---|---|---|---|
 | GET | `/clinicas` | Lists clinics; accepts `?nome=` | No |
 | GET | `/clinicas/:id` | Finds by ID | No |
-| POST | `/clinicas` | Creates a clinic | No |
-| PUT | `/clinicas/:id` | Updates a clinic | No |
-| DELETE | `/clinicas/:id` | Deletes a clinic | No |
+| POST | `/clinicas` | Creates a clinic | Yes (`ADMIN`) |
+| PUT | `/clinicas/:id` | Updates a clinic | Yes (`ADMIN`) |
+| DELETE | `/clinicas/:id` | Deletes a clinic | Yes (`ADMIN`) |
 
 **Filter:** `GET /clinicas?nome=vida` uses `ILIKE %vida%`. The filter exists in the controller but is not documented in Swagger.
 
@@ -1725,9 +1975,9 @@ Returns the authenticated user's public data, without `senha_hash`, plus `"perfi
 |---|---|---|---|
 | GET | `/profissionais` | Lists and filters professionals | No |
 | GET | `/profissionais/:id` | Finds by ID | No |
-| POST | `/profissionais` | Creates a professional | No |
-| PUT | `/profissionais/:id` | Updates a professional | No |
-| DELETE | `/profissionais/:id` | Deletes a professional | No |
+| POST | `/profissionais` | Creates a professional | Yes (`ADMIN`) |
+| PUT | `/profissionais/:id` | Updates a professional | Yes (`ADMIN`) |
+| DELETE | `/profissionais/:id` | Deletes a professional | Yes (`ADMIN`) |
 
 **Filters (query string):**
 
@@ -1775,9 +2025,9 @@ Precedence is `nome` > `clinica` > `especialidade`. Without a filter, all record
 | GET | `/disponibilidades` | Lists all slots with the professional's name | No |
 | GET | `/disponibilidades/profissional/:id` | Lists a professional's slots | No |
 | GET | `/disponibilidades/:id` | Finds by ID | No |
-| POST | `/disponibilidades` | Creates a slot | No |
-| PUT | `/disponibilidades/:id` | Updates a slot | No |
-| DELETE | `/disponibilidades/:id` | Deletes a slot | No |
+| POST | `/disponibilidades` | Creates a slot | Yes (`ADMIN`) |
+| PUT | `/disponibilidades/:id` | Updates a slot | Yes (`ADMIN`) |
+| DELETE | `/disponibilidades/:id` | Deletes a slot | Yes (`ADMIN`) |
 
 **Create body:**
 
@@ -1804,13 +2054,15 @@ Precedence is `nome` > `clinica` > `especialidade`. Without a filter, all record
 
 | Method | Route | Description | Authentication |
 |---|---|---|---|
-| GET | `/agendamentos` | Lists all with related data | No |
-| GET | `/agendamentos/:id` | Finds by ID | No |
-| GET | `/agendamentos/paciente/:idPaciente` | Lists by patient | No |
-| POST | `/agendamentos` | Creates an appointment | No |
-| PUT | `/agendamentos/:id` | Updates notes/status | No |
-| PATCH | `/agendamentos/:id/cancelar` | Cancels an appointment | No |
-| DELETE | `/agendamentos/:id` | Deletes an appointment | No |
+| GET | `/agendamentos` | Lists all with related data | Yes (`ADMIN`) |
+| GET | `/agendamentos/me` | Lists the authenticated patient's appointments | Yes (`PACIENTE`) |
+| GET | `/agendamentos/:id` | Finds by ID | Yes (`PACIENTE` owner or `ADMIN`) |
+| GET | `/agendamentos/paciente/:idPaciente` | Lists by patient | Yes (`PACIENTE` owner or `ADMIN`) |
+| POST | `/agendamentos` | Creates an appointment; accepts `id_triagem` | Yes (`PACIENTE` or `ADMIN`) |
+| PUT | `/agendamentos/:id` | Updates notes/status | Yes (`PACIENTE` owner or `ADMIN`) |
+| PATCH | `/agendamentos/:id/cancelar` | Cancels an appointment | Yes (`PACIENTE` owner or `ADMIN`) |
+| PATCH | `/agendamentos/:id/reagendar` | Reschedules to a new date/time | Yes (`PACIENTE` owner) |
+| DELETE | `/agendamentos/:id` | Deletes an appointment | Yes (`PACIENTE` owner or `ADMIN`) |
 
 **Create body:**
 
@@ -1819,13 +2071,14 @@ Precedence is `nome` > `clinica` > `especialidade`. Without a filter, all record
   "id_paciente": 1,
   "id_profissional": 1,
   "id_disponibilidade": 1,
-  "observacao": "First visit"
+  "observacao": "First visit",
+  "id_triagem": 1
 }
 ```
 
 **Creation validations:**
 
-1. Patient, professional, and availability are required and numeric.
+1. Patient, professional, and availability are required and numeric. For a `PACIENTE`, `id_paciente` comes from the token; for an `ADMIN`, it can be sent in the body.
 2. The patient must exist and be active (`404` or `409`).
 3. The availability slot must exist (`404`).
 4. The slot must belong to the given professional (`400`).
@@ -1833,6 +2086,7 @@ Precedence is `nome` > `clinica` > `especialidade`. Without a filter, all record
 6. The slot must have status `DISPONIVEL` (`409`).
 7. The patient cannot have another appointment at the same date and time, except a canceled one (`409`).
 8. Reservation and `INSERT` run in a single atomic CTE. If another request takes the slot in the meantime, the operation returns `409`.
+9. `id_triagem` is optional. When present, the triage must exist (`404`), must belong to the same patient (`403`), and must not be linked to another appointment (`409`); the link is written after the appointment is created.
 
 **Update rules:**
 
@@ -1840,7 +2094,19 @@ Precedence is `nome` > `clinica` > `especialidade`. Without a filter, all record
 - Accepted statuses: `AGENDADO`, `CONFIRMADO`, `CANCELADO`, `REALIZADO`.
 - Changing to `CANCELADO` delegates to the cancellation operation.
 - An already canceled appointment cannot be changed.
-- There is no rescheduling operation (changing date, time, or professional).
+- Changing the status to `CONFIRMADO` sends the `AGENDAMENTO_CONFIRMADO` notification; the other changes send `AGENDAMENTO_ATUALIZADO`.
+
+**Rescheduling (`PATCH /:id/reagendar`):**
+
+- Only the patient owner can reschedule; administrators cannot use this operation;
+- a `CANCELADO` or `REALIZADO` appointment cannot be rescheduled (`409`);
+- the new slot must exist (`404`), have an active professional (`409`), and cause no time conflict for the patient (`409`);
+- the new slot is reserved with `UPDATE ... WHERE status = 'DISPONIVEL' RETURNING *`; when no row returns, the response is `409` and nothing else is changed;
+- the appointment is updated with the new date, time, and professional; the old slot is released back to `DISPONIVEL` only afterwards;
+- the operation runs in a single SQL statement with CTEs (reserve → update → release), guaranteed atomic by Postgres; when the new slot is not `DISPONIVEL`, none of the steps are applied;
+- rescheduling to the same current slot responds `409` before touching the database;
+- it sends the `AGENDAMENTO_REAGENDADO` notification with the old and new times;
+- the current status (`AGENDADO`/`CONFIRMADO`) is kept.
 
 **Cancellation:**
 
@@ -1917,6 +2183,85 @@ All routes require `Authorization: Bearer <token>` from a user with the `ADMIN` 
 
 ---
 
+### 6.11 Triage
+
+All routes require `Authorization: Bearer <token>`. Patients can access only their own triage records; the full listing is restricted to the `ADMIN` profile.
+
+| Method | Route | Description | Authentication |
+|---|---|---|---|
+| POST | `/triagens/chat` | AI guidance chatbot | Yes (`PACIENTE`) |
+| POST | `/triagens` | Creates a triage record with AI analysis and saves the recommendation | Yes (`PACIENTE`) |
+| GET | `/triagens/me` | Lists the authenticated patient's triage records | Yes (`PACIENTE`) |
+| GET | `/triagens` | Lists all triage records | Yes (`ADMIN`) |
+| GET | `/triagens/:id` | Finds a triage record by ID | Yes (`PACIENTE` owner or `ADMIN`) |
+| PUT | `/triagens/:id` | Updates a triage record | Yes (`PACIENTE` owner) |
+| DELETE | `/triagens/:id` | Deletes a triage record | Yes (`PACIENTE` owner) |
+
+**Create body:**
+
+```json
+{
+  "sintomas": ["dor de cabeça", "febre"],
+  "localizacao": "cabeça",
+  "duracao_sintomas": "3 dias",
+  "intensidade": 4,
+  "faixa_etaria": "30-39 anos",
+  "observacoes": "Piora à noite"
+}
+```
+
+**Rules:**
+
+- `id_paciente` comes from the token and is not accepted in the body;
+- `sintomas` accepts an array or a string; arrays are converted to comma-separated text;
+- `localizacao` and `duracao_sintomas` are required;
+- `intensidade` must be an integer from `1` to `5`;
+- `PUT` is partial: missing fields keep their current values, but the final set is fully validated;
+- patients can only update or delete their own triage records (`403` otherwise);
+- when a triage is deleted, the corresponding recommendation is deleted first (the `recomendacoes.id_triagem` FK has no `ON DELETE CASCADE`);
+- `GET /triagens/:id` lets patients see only their own record and `ADMIN` see any record;
+- `POST /triagens` also requires `faixa_etaria` — used only in the AI call and never stored —, considers only active specialties, and is the single creation flow: it calls the AI before any write, saves the triage in `triagens`, and the suggestion in `recomendacoes`; if the AI fails, nothing is saved; if the recommendation write fails, the created triage is discarded; the response includes `id_triagem`, `id_recomendacao`, `especialidade`, `confianca` (0 to 100), and `justificativa`, and that `id_triagem` can be sent in `POST /agendamentos`;
+- `POST /triagens/chat` receives `{ mensagem, historico? }` and returns `{ resposta, especialidade, confianca, justificativa }`; `especialidade` can be `null` when no registered specialty fits;
+- the AI does not provide diagnoses or recommend medication or treatments.
+
+---
+
+### 6.12 Notifications
+
+All routes require `Authorization: Bearer <token>` from a patient and return only the authenticated user's notifications.
+
+| Method | Route | Description | Authentication |
+|---|---|---|---|
+| GET | `/notificacoes` | Lists the authenticated patient's notifications | Yes (`PACIENTE`) |
+| PATCH | `/notificacoes/lidas` | Marks all notifications as read | Yes (`PACIENTE`) |
+| PATCH | `/notificacoes/:id/lida` | Marks one notification as read | Yes (`PACIENTE` owner) |
+| DELETE | `/notificacoes/:id` | Deletes a notification | Yes (`PACIENTE` owner) |
+
+**Automatically generated notifications:**
+
+| Event | Type | Recipient |
+|---|---|---|
+| Appointment created | `AGENDAMENTO_CRIADO` | Appointment patient |
+| Appointment updated | `AGENDAMENTO_ATUALIZADO` | Appointment patient |
+| Appointment confirmed | `AGENDAMENTO_CONFIRMADO` | Appointment patient |
+| Appointment rescheduled | `AGENDAMENTO_REAGENDADO` | Appointment patient |
+| Appointment canceled | `AGENDAMENTO_CANCELADO` | Appointment patient |
+| Appointment deleted | `AGENDAMENTO_EXCLUIDO` | Appointment patient |
+| AI triage analysis completed | `PRE_TRIAGEM_IA` | Triage patient |
+| Upcoming appointment (periodic job) | `LEMBRETE_CONSULTA` | Appointment patient |
+
+**Rules:**
+
+- each notification belongs to a single patient;
+- patients can only read, mark as read, or delete their own notifications (`403` otherwise);
+- the list is ordered from newest to oldest;
+- failures to save a notification do not interrupt the appointment or triage flow; the error is only logged;
+- the table is created by the `sql/notificacoes.sql` script;
+- the appointment reminder is generated by an in-process job (`src/jobs/lembretesJob.js`) every `LEMBRETE_INTERVALO_MINUTOS` minutes, for `AGENDADO` or `CONFIRMADO` appointments occurring within the next `LEMBRETE_ANTECEDENCIA_HORAS` hours;
+- the job does not duplicate reminders: before creating one, it checks whether a `LEMBRETE_CONSULTA` already exists for the same appointment.
+
+---
+
 ## 7. Consolidated business rules
 
 - Patient and professional CPFs are stored without punctuation and validated by length only (11 digits).
@@ -1935,10 +2280,15 @@ All routes require `Authorization: Bearer <token>` from a user with the `ADMIN` 
 - Appointment status follows: `AGENDADO` → `CONFIRMADO`/`REALIZADO`/`CANCELADO`; `CANCELADO` is terminal for further changes.
 - There is no validation for future dates or overlapping slots when creating availability.
 - There is no pagination in any listing.
-- There is no rescheduling operation.
+- The patient owner can reschedule their own appointment in `PATCH /agendamentos/:id/reagendar`; the new slot is reserved before the update, which precedes releasing the old slot.
 - Patient creation forces `ativo: true`; updates can deactivate it.
 - Professional creation allows `ativo: false`.
 - Administrator creation forces `ativo: true`.
+- In-app notifications are generated for the patient on appointment events (creation, update, confirmation, rescheduling, cancellation, and deletion), triage events (creation with AI analysis), and upcoming appointments (reminder).
+- A failure to save a notification does not undo the main operation; the error is only logged.
+- The AI specialty suggestion is persisted in `recomendacoes`; the link to an appointment of the same patient is made in `POST /agendamentos` with `id_triagem`.
+- When creating an appointment as `PACIENTE`, `id_paciente` comes from the token; an `ADMIN` can send the patient in the body.
+- Public read routes remain open; administrative writes require `ADMIN`, and patient operations require `PACIENTE` with ownership checks.
 
 ---
 
@@ -1976,14 +2326,18 @@ The `id` field is generic: it represents `id_paciente`, `id_profissional`, or `i
 | `/auth/login` | Public |
 | `GET /auth/perfil` | JWT + `PACIENTE`, `PROFISSIONAL`, or `ADMIN` |
 | `/administradores` | JWT + `ADMIN` |
-| `/pacientes` | Public |
-| `/especialidades` | Public |
-| `/clinicas` | Public |
-| `/profissionais` | Public |
-| `/disponibilidades` | Public |
-| `/agendamentos` | Public |
+| `/pacientes` (administrative writes and listing) | JWT + `ADMIN`; `DELETE` is `ADMIN` only |
+| `/pacientes/me` | JWT + `PACIENTE` |
+| `/pacientes/:id` | JWT + `PACIENTE` owner or `ADMIN` (except `POST /pacientes`, public) |
+| `/especialidades`, `/clinicas`, `/profissionais`, `/disponibilidades` | Public reads; `POST`/`PUT`/`DELETE` require JWT + `ADMIN` |
+| `/agendamentos` | JWT + `PACIENTE` or `ADMIN`; patients can only access their own appointments |
+| `/agendamentos/:id/reagendar` | JWT + `PACIENTE` owner of the appointment |
+| `/triagens` (patient) | JWT + `PACIENTE`, with ownership checks on `GET /:id`, `PUT`, and `DELETE` |
+| `GET /triagens` | JWT + `ADMIN` |
+| `/triagens/chat` | JWT + `PACIENTE` |
+| `/notificacoes` | JWT + `PACIENTE`, with ownership checks on `PATCH /:id/lida` and `DELETE /:id` |
 
-**All business endpoints for patients, specialties, clinics, professionals, availability, and appointments are public.** Only the administrator module and the authenticated profile require a token.
+**Summary:** catalog reads (filtered patients, specialties, clinics, professionals, and availability) and public patient registration remain open. A token is required for all authenticated patient flows, administrative writes, appointments, triage, notifications, and the administrator module.
 
 ### 8.4 Implemented security and limitations
 
@@ -2038,6 +2392,8 @@ An unknown route returns `404` with `{"erro":"Rota não encontrada"}`.
 | Professionals | `GET /:id` returns `404` for any error; `POST`, `PUT`, and `DELETE` return `400` for any error; `GET /` returns `500` |
 | Availability | `GET /` and `GET /profissional/:id` return `500`; `GET /:id` and `DELETE` return `404`; `POST` and `PUT` return `400` |
 | Administrators | `GET /` returns `500`; `GET /:id` returns `404`; `POST`, `PUT`, and `DELETE` return `400` |
+| Triage | Uses the standardized helper, respects `statusCode`, and returns `403` when accessing another patient's record |
+| Notifications | Uses the standardized helper, respects `statusCode`, and returns `403` when accessing another patient's notification |
 
 ### 9.3 Known inconsistencies
 

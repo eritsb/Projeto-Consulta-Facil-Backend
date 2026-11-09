@@ -81,9 +81,20 @@ class PacientesService {
     );
   }
 
-  static async buscarPorId(id) {
+  static async buscarPorId(id, usuario) {
     const idPaciente =
       this.validarId(id);
+
+    if (
+      usuario &&
+      usuario.perfil === "PACIENTE" &&
+      idPaciente !== Number(usuario.id)
+    ) {
+      throw this.criarErro(
+        "Você não pode consultar outro paciente",
+        403
+      );
+    }
 
     const paciente =
       await Pacientes.buscarPorId(
@@ -179,9 +190,20 @@ class PacientesService {
     });
   }
 
-  static async atualizar(id, dados) {
+  static async atualizar(id, dados, usuario) {
     const idPaciente =
       this.validarId(id);
+
+    if (
+      usuario &&
+      usuario.perfil === "PACIENTE" &&
+      idPaciente !== Number(usuario.id)
+    ) {
+      throw this.criarErro(
+        "Você não pode alterar outro paciente",
+        403
+      );
+    }
 
     const pacienteAtual =
       await Pacientes

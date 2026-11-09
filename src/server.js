@@ -1,4 +1,3 @@
-
 require("dotenv").config();
 
 const express = require("express");
@@ -36,14 +35,23 @@ const authRoutes =
 const administradoresRoutes =
   require("./routes/administradoresRoutes");
 
+const triagensRoutes =
+  require("./routes/triagensRoutes");
+
+const notificacoesRoutes =
+  require("./routes/notificacoesRoutes");
+
+const lembretesJob =
+  require("./jobs/lembretesJob");
+
+const transcricaoRoutes =
+  require("./routes/transcricaoRoutes");
+
 const app = express();
 
 app.use(helmet());
-
 app.use(morgan("dev"));
-
 app.use(cors());
-
 app.use(express.json());
 
 app.get("/", (req, res) => {
@@ -99,6 +107,36 @@ app.use(
   administradoresRoutes
 );
 
+app.use(
+  "/triagens",
+  triagensRoutes
+);
+
+app.use(
+  "/notificacoes",
+  notificacoesRoutes
+);
+
+app.use(
+  "/audio",
+  transcricaoRoutes
+);
+
+app.use((err, req, res, next) => {
+  console.error(err);
+
+  const status =
+    err.statusCode || 500;
+
+  const mensagem =
+    err.message ||
+    "Erro interno do servidor";
+
+  return res.status(status).json({
+    erro: mensagem
+  });
+});
+
 app.use((req, res) => {
   return res.status(404).json({
     erro: "Rota não encontrada"
@@ -112,4 +150,6 @@ app.listen(PORT, () => {
   console.log(
     `Servidor rodando em http://localhost:${PORT}`
   );
+
+  lembretesJob.iniciar();
 });

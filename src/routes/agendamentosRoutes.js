@@ -3,6 +3,14 @@ const express = require("express");
 const AgendamentosController =
   require("../controllers/agendamentosController");
 
+const autenticacao = require(
+  "../middlewares/autenticacao"
+);
+
+const autorizarPerfis = require(
+  "../middlewares/autorizarPerfis"
+);
+
 const router = express.Router();
 
 /**
@@ -13,6 +21,8 @@ const router = express.Router();
  *     description: Retorna todos os agendamentos associados ao paciente informado.
  *     tags:
  *       - Agendamentos
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: idPaciente
@@ -33,6 +43,8 @@ const router = express.Router();
  */
 router.get(
   "/paciente/:idPaciente",
+  autenticacao,
+  autorizarPerfis("PACIENTE", "ADMIN"),
   AgendamentosController.listarPorPaciente
 );
 
@@ -44,6 +56,8 @@ router.get(
  *     description: Retorna os agendamentos com informações do paciente, profissional, clínica, especialidade, data, horário e situação.
  *     tags:
  *       - Agendamentos
+ *     security:
+ *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: Lista de agendamentos retornada com sucesso
@@ -52,7 +66,39 @@ router.get(
  */
 router.get(
   "/",
+  autenticacao,
+  autorizarPerfis("ADMIN"),
   AgendamentosController.listar
+);
+
+/**
+ * @swagger
+ * /agendamentos/me:
+ *   get:
+ *     summary: Lista os agendamentos do paciente autenticado
+ *     description: |
+ *       Retorna o histórico de agendamentos do paciente autenticado.
+ *
+ *       Perfis permitidos: PACIENTE.
+ *     tags:
+ *       - Agendamentos
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Agendamentos retornados com sucesso
+ *       401:
+ *         description: Token não informado, inválido ou expirado
+ *       403:
+ *         description: Usuário sem permissão para esta operação
+ *       500:
+ *         description: Erro interno do servidor
+ */
+router.get(
+  "/me",
+  autenticacao,
+  autorizarPerfis("PACIENTE"),
+  AgendamentosController.listarMe
 );
 
 /**
@@ -62,6 +108,8 @@ router.get(
  *     summary: Busca um agendamento pelo ID
  *     tags:
  *       - Agendamentos
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -82,6 +130,8 @@ router.get(
  */
 router.get(
   "/:id",
+  autenticacao,
+  autorizarPerfis("PACIENTE", "ADMIN"),
   AgendamentosController.buscarPorId
 );
 
@@ -93,6 +143,8 @@ router.get(
  *     description: Reserva uma disponibilidade e cria um agendamento para o paciente.
  *     tags:
  *       - Agendamentos
+ *     security:
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -117,20 +169,29 @@ router.get(
  *                 type: string
  *                 nullable: true
  *                 example: Primeira consulta
+ *               id_triagem:
+ *                 type: integer
+ *                 nullable: true
+ *                 description: ID de uma triagem do próprio paciente para vincular ao agendamento
+ *                 example: 1
  *     responses:
  *       201:
  *         description: Agendamento realizado com sucesso
  *       400:
  *         description: Dados inválidos ou incompletos
+ *       403:
+ *         description: Triagem pertence a outro paciente
  *       404:
- *         description: Paciente ou disponibilidade não encontrada
+ *         description: Paciente, disponibilidade ou triagem não encontrada
  *       409:
- *         description: Horário indisponível ou conflito de agendamento
+ *         description: Horário indisponível, conflito ou triagem já vinculada
  *       500:
  *         description: Erro interno do servidor
  */
 router.post(
   "/",
+  autenticacao,
+  autorizarPerfis("PACIENTE", "ADMIN"),
   AgendamentosController.cadastrar
 );
 
@@ -139,9 +200,11 @@ router.post(
  * /agendamentos/{id}:
  *   put:
  *     summary: Atualiza um agendamento
- *     description: Atualiza a observação ou a situação do agendamento.
+ *     description: Atualiza a observação ou a situação do agendamento. Mudar o status para CONFIRMADO envia a notificação AGENDAMENTO_CONFIRMADO; as demais alterações enviam AGENDAMENTO_ATUALIZADO.
  *     tags:
  *       - Agendamentos
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -183,6 +246,8 @@ router.post(
  */
 router.put(
   "/:id",
+  autenticacao,
+  autorizarPerfis("PACIENTE", "ADMIN"),
   AgendamentosController.atualizar
 );
 
@@ -194,6 +259,8 @@ router.put(
  *     description: Altera a situação para CANCELADO e libera novamente a disponibilidade.
  *     tags:
  *       - Agendamentos
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -216,7 +283,71 @@ router.put(
  */
 router.patch(
   "/:id/cancelar",
+  autenticacao,
+  autorizarPerfis("PACIENTE", "ADMIN"),
   AgendamentosController.cancelar
+);
+
+/**
+ * @swagger
+ * /agendamentos/{id}/reagendar:
+ *   patch:
+ *     summary: Reagenda um agendamento para outro horário
+ *     description: |
+ *       Permite apenas ao paciente dono reservar uma nova disponibilidade
+ *       e atualizar o agendamento com a nova data, horário e profissional.
+ *       A antiga disponibilidade volta a ficar disponível somente após o
+ *       sucesso da atualização; se a nova disponibilidade não estiver
+ *       `DISPONIVEL`, nada é alterado.
+ *
+ *       Agendamentos `CANCELADO` ou `REALIZADO` não podem ser reagendados
+ *       e a situação atual do agendamento é mantida.
+ *     tags:
+ *       - Agendamentos
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: ID do agendamento
+ *         schema:
+ *           type: integer
+ *           example: 9
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - id_disponibilidade
+ *             properties:
+ *               id_disponibilidade:
+ *                 type: integer
+ *                 description: ID da nova disponibilidade, que deve estar DISPONIVEL
+ *                 example: 12
+ *     responses:
+ *       200:
+ *         description: Agendamento reagendado com sucesso
+ *       400:
+ *         description: ID do agendamento ou da disponibilidade inválido
+ *       401:
+ *         description: Token não informado, inválido ou expirado
+ *       403:
+ *         description: Somente o paciente dono pode reagendar o agendamento
+ *       404:
+ *         description: Agendamento ou disponibilidade não encontrados
+ *       409:
+ *         description: Cancelado/realizado não pode reagendar, profissional inativo, horário indisponível ou conflito de horário
+ *       500:
+ *         description: Erro interno do servidor
+ */
+router.patch(
+  "/:id/reagendar",
+  autenticacao,
+  autorizarPerfis("PACIENTE"),
+  AgendamentosController.reagendar
 );
 
 /**
@@ -227,6 +358,8 @@ router.patch(
  *     description: Remove definitivamente o agendamento e libera a disponibilidade vinculada.
  *     tags:
  *       - Agendamentos
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -247,6 +380,8 @@ router.patch(
  */
 router.delete(
   "/:id",
+  autenticacao,
+  autorizarPerfis("PACIENTE", "ADMIN"),
   AgendamentosController.excluir
 );
 

@@ -111,6 +111,70 @@ class Agendamentos {
     return resultado[0];
   }
 
+  static async listarProximos(horas) {
+    return await sql`
+      SELECT
+        a.id_agendamento,
+        a.id_paciente,
+        pa.nome AS paciente_nome,
+
+        a.id_profissional,
+        pr.nome AS profissional_nome,
+
+        cl.id_clinica,
+        cl.nome AS clinica_nome,
+
+        es.id_especialidade,
+        es.nome AS especialidade_nome,
+
+        a.id_disponibilidade,
+        a.data_consulta,
+        a.hora_consulta,
+        d.hora_fim,
+
+        a.status,
+        a.observacao,
+        a.data_criacao
+
+      FROM agendamentos a
+
+      INNER JOIN pacientes pa
+        ON pa.id_paciente =
+           a.id_paciente
+
+      INNER JOIN profissionais pr
+        ON pr.id_profissional =
+           a.id_profissional
+
+      INNER JOIN clinicas cl
+        ON cl.id_clinica =
+           pr.id_clinica
+
+      INNER JOIN especialidades es
+        ON es.id_especialidade =
+           pr.id_especialidade
+
+      INNER JOIN disponibilidades d
+        ON d.id_disponibilidade =
+           a.id_disponibilidade
+
+      WHERE a.status IN (
+        'AGENDADO',
+        'CONFIRMADO'
+      )
+
+        AND (
+          a.data_consulta + a.hora_consulta
+        ) BETWEEN LOCALTIMESTAMP
+          AND LOCALTIMESTAMP +
+              make_interval(hours => ${horas}::int)
+
+      ORDER BY
+        a.data_consulta,
+        a.hora_consulta
+    `;
+  }
+
   static async listarPorPaciente(
     idPaciente
   ) {
@@ -341,6 +405,84 @@ class Agendamentos {
     `;
 
     return resultado[0];
+  }
+
+  /*
+    Reagenda em um único statement com CTEs,
+    seguindo a ordem exigida: reserva a nova
+    disponibilidade, atualiza o agendamento
+    aproveitando os valores já retornados pela
+    reserva e só então libera a antiga.
+    Por ser um statement só, o Postgres aplica
+    tudo com atomicidade: se a nova
+    disponibilidade não estiver DISPONIVEL,
+    nenhum passo é aplicado e a consulta
+    devolve nenhuma linha (o service responde
+    409 sem alterar mais nada).
+  */
+  static async reagendar(dados) {
+    const {
+      id_agendamento,
+      id_disponibilidade_nova,
+      id_disponibilidade_antiga
+    } = dados;
+
+    const resultado = await sql`
+      WITH disponibilidade_reservada AS (
+        UPDATE disponibilidades
+
+        SET status = 'RESERVADO'
+
+        WHERE id_disponibilidade =
+              ${id_disponibilidade_nova}
+
+          AND status = 'DISPONIVEL'
+
+        RETURNING
+          id_disponibilidade,
+          id_profissional,
+          data,
+          hora_inicio
+      ),
+
+      agendamento_atualizado AS (
+        UPDATE agendamentos
+
+        SET
+          id_profissional = n.id_profissional,
+          id_disponibilidade = n.id_disponibilidade,
+          data_consulta = n.data,
+          hora_consulta = n.hora_inicio
+
+        FROM disponibilidade_reservada n
+
+        WHERE id_agendamento =
+              ${id_agendamento}
+
+        RETURNING
+          agendamentos.id_agendamento,
+          agendamentos.id_disponibilidade
+      ),
+
+      disponibilidade_liberada AS (
+        UPDATE disponibilidades
+
+        SET status = 'DISPONIVEL'
+
+        FROM agendamento_atualizado r
+
+        WHERE disponibilidades.id_disponibilidade =
+              ${id_disponibilidade_antiga}
+
+          AND disponibilidades.id_disponibilidade <>
+              r.id_disponibilidade
+      )
+
+      SELECT *
+      FROM agendamento_atualizado
+    `;
+
+    return resultado[0] || null;
   }
 
   static async cancelar(id) {
